@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HAND VIEWER MUAHAHAH</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {background: blanchedalmond; overflow: hidden;}
+        canvas {display: block;}
+        #status {
+            position: absolute; top: 16px; left: 16px; 
+            font: 500 13px/1 monospace; color: #333; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- canvas for drawing the hand landmarks -->
+    <div id="status">Connecting...</div>
+    <div id="label"></div>
+
+    <!-- cloudfare three.js -->
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+     <script>
+        // ----------- scene setup -----------
+        const renderer = new THREE.WebGLRenderer({antialias: true});
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+        camera.position.set(0, 0, 1.8);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+        dir.position.set(1, 2, 3);
+        scene.add(dir);
+
+        window.addEventListener("resize", () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ----------- hand setup -----------
+        const CONNECTIONS = [
+            [0,1],[1,2],[2,3],[3,4],
+            [0,5],[5,6],[6,7],[7,8],
+            [0,9],[9,10],[10,11],[11,12],
+            [0,13],[13,14],[14,15],[15,16],
+            [0,17],[17,18],[18,19],[19,20],
+            [5,9],[9,13],[13,17],
+        ];
+        const FINGERTIPS = new Set([4, 8, 12, 16, 20]);
+
+        const JOINT_MAT = new THREE.MeshPhongMaterial({ color: 0xffffff });
+        const BONE_MAT  = new THREE.MeshPhongMaterial({ color: 0x58c97a });
+        const TIP_MAT   = new THREE.MeshPhongMaterial({ color: 0x58c97a });
+
+        const joints = Array.from({length: 21}, (_, i) => {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(FINGERTIPS.has(i) ? 0.018 : 0.013, 12, 12),
+                FINGERTIPS.has(i) ? TIP_MAT : JOINT_MAT
+            );
+            mesh.visible = false;
+            scene.add(mesh);
+            return mesh;
+        });
+
+        const bones = CONNECTIONS.map(() => {
+            const mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.006, 0.006, 1, 8),
+                BONE_MAT
+            );
+            mesh.visible = false;
+            scene.add(mesh);
+            return mesh;
+        });
+
+        // ----------- interpolation state -----------
+        // targetPositions: latest positions received from WS (30fps)
+        // joints lerp toward them each rAF frame (60fps) — fills the gaps smoothly
+        const targetPositions = Array.from({length: 21}, () => new THREE.Vector3());
+        let hasTarget = false;
+        // lerp factor per frame: 0.45 → closes ~45% of remaining gap each frame
+        // at 60fps this reaches 97% of target in ~6 frames (~100ms) — snappy but smooth
+        const LERP = 0.45;
+
+        // reusable vectors
+        const _mid = new THREE.Vector3();
+        const _dir = new THREE.Vector3();
+        const _up  = new THREE.Vector3(0, 1, 0);
+        const _q   = new THREE.Quaternion();
+
+        function lmToVec3(lm) {
+            return new THREE.Vector3(
+                (lm.x - 0.5) * 2.0,
+                -(lm.y - 0.5) * 2.0,
+                -lm.z * 2.5
+            );
+        }
+
+        // called on each WS message — only updates targets, no rendering here
+        function setTargets(landmarks) {
+            landmarks.forEach((lm, i) => targetPositions[i].copy(lmToVec3(lm)));
+            hasTarget = true;
+            joints.forEach(m => m.visible = true);
+            bones.forEach(m  => m.visible = true);
+        }
+
+        function hideHand() {
+            hasTarget = false;
+            joints.forEach(m => m.visible = false);
+            bones.forEach(m  => m.visible = false);
+        }
+
+        // called every rAF frame — lerps joints toward targets, then recomputes bones
+        function stepInterpolation() {
+            if (!hasTarget) return;
+
+            joints.forEach((mesh, i) => {
+                mesh.position.lerp(targetPositions[i], LERP);
+            });
+
+            CONNECTIONS.forEach(([a, b], i) => {
+                const pa = joints[a].position;
+                const pb = joints[b].position;
+
+                _mid.addVectors(pa, pb).multiplyScalar(0.5);
+                const len = pa.distanceTo(pb);
+
+                bones[i].position.copy(_mid);
+                _dir.subVectors(pb, pa).normalize();
+                _q.setFromUnitVectors(_up, _dir);
+                bones[i].setRotationFromQuaternion(_q);
+                bones[i].scale.set(1, len, 1);
+            });
+        }
+
+        // ----------- websocket -----------
+        const statusE1 = document.getElementById("status");
+        const labelE1  = document.getElementById("label");
+        let ws;
+
+        function connect() {
+            ws = new WebSocket("ws://localhost:8765");
+
+            ws.onopen = () => {
+                statusE1.textContent = "Connected";
+                statusE1.classList.add("connected");
+            };
+
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.landmarks) {
+                    setTargets(data.landmarks);
+                    labelE1.textContent = data.hand || "";
+                } else {
+                    hideHand();
+                    labelE1.textContent = "No hand detected";
+                }
+            };
+
+            ws.onclose = () => {
+                statusE1.textContent = "Disconnected. Reconnecting...";
+                statusE1.classList.remove("connected");
+                hideHand();
+                setTimeout(connect, 1500);
+            };
+
+            ws.onerror = () => ws.close();
+        }
+
+        connect();
+
+        // ----------- render loop -----------
+        function animate() {
+            requestAnimationFrame(animate);
+            stepInterpolation();
+            renderer.render(scene, camera);
+        }
+        animate();
+     </script>
+
+</body>
+</html>

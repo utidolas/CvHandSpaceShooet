@@ -120,6 +120,7 @@ class HandFilter:
 # --- webscoket server ---
 _latest_payload: str | None = None
 _connected_clients: set = set()
+_payload_dirty: bool = False  # True only when new ML data arrived since last broadcast
 
 async def _ws_handler(websocket):
     _connected_clients.add(websocket)
@@ -131,9 +132,10 @@ async def _ws_handler(websocket):
         _connected_clients.discard(websocket)
 
 async def _broadcast_loop():
-    global _latest_payload, _connected_clients
+    global _latest_payload, _connected_clients, _payload_dirty
     while True:
-        if _latest_payload and _connected_clients: 
+        if _payload_dirty and _latest_payload and _connected_clients:
+            _payload_dirty = False
             dead = set()
             for ws in list(_connected_clients):
                 try:
@@ -149,7 +151,7 @@ async def _run_ws_server():
         await _broadcast_loop()
 
 # start ws server 
-async def start_ws_server():
+def start_ws_server():
     asyncio.run(_run_ws_server())
 
 # -- HTTPS server ---
@@ -182,7 +184,7 @@ def draw_hand(frame, hand_landmarks, label):
 
 # -- main looop ---
 def main():
-    global _latest_payload
+    global _latest_payload, _payload_dirty
 
     # start ws server in background thread
     threading.Thread(target=start_ws_server, daemon=True).start()
@@ -198,17 +200,22 @@ def main():
         base_options=BaseOptions(model_asset_path=MODEL_PATH),
         running_mode=VisionRunningMode.VIDEO,
         num_hands=1,
-        min_hand_detection_confidence=0.7,
-        min_hand_presence_confidence=0.7,
-        min_tracking_confidence=0.5
+        min_hand_detection_confidence=0.5,  # lower → reacquires faster after motion blur
+        min_hand_presence_confidence=0.5,
+        min_tracking_confidence=0.4
     )
 
     # start video capture
-    cap = cv2.VideoCapture(0)   
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap = cv2.VideoCapture(0)
+    # MJPEG compresses on the camera chip — much lower USB bus time than raw YUYV
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+    # 640x480: less motion blur per pixel on fast moves → fewer detection drops
+    # also halves MediaPipe inference time vs 1280x720
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-    hand_filter = HandFilter(min_cutoff=1.0, beta=0.01)
+    hand_filter = HandFilter(min_cutoff=1.0, beta=0.05)
+    last_seen: float = 0.0  # timestamp of last successful detection
     fps_counter = 0
     fps_display = 0.0
     fps_timer = time.time()
@@ -231,11 +238,20 @@ def main():
                 raw_landmarks = result.hand_landmarks[0] # get first hand
                 raw_label = result.handedness[0][0].display_name # label
                 label = "Left" if raw_label == "Right" else "Right"
+
+                # if hand was absent for >300ms, reset filter so it
+                # snaps instantly to the new position instead of gliding from the old one
+                if now - last_seen > 0.3:
+                    hand_filter = HandFilter(min_cutoff=1.0, beta=0.05)
+                last_seen = now
+
                 smoothed = hand_filter.apply(raw_landmarks, now) # apply filter
                 _latest_payload = json.dumps({"landmarks": smoothed, "hand": label}) # update payload
+                _payload_dirty = True
                 draw_hand(frame, raw_landmarks, label) # draw on frame
             else:
                 _latest_payload = json.dumps({"landmarks": None, "hand": None}) # no hand detected, clear payload
+                _payload_dirty = True
                 cv2.putText(frame, "No hand detected", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 80), 2, cv2.LINE_AA)
             
             # fps calculation
