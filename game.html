@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aetheric Skies — Steam Punk Shooter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+
+  <canvas id="gc"></canvas>
+
+  <div id="hud">
+    <div id="top-bar">
+      <div id="wave-display">
+        <span class="top-label">WAVE</span>
+        <span id="wave-num">1</span>
+      </div>
+      <div id="timer-display">
+        <span class="top-label">TIME</span>
+        <span id="timer-num">60</span>
+        <div id="timer-track"><div id="timer-fill"></div></div>
+      </div>
+      <div id="score-display">
+        <span class="top-label">SCORE</span>
+        <span id="score-num">00000</span>
+      </div>
+    </div>
+
+    <div id="stats-panel">
+      <div class="panel-heading">&#9881; PILOT STATS</div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9829;</span>
+        <span class="stat-name">HULL</span>
+        <div class="bar-wrap">
+          <div id="hp-ghost" class="bar hp-ghost"></div>
+          <div id="hp-fill"  class="bar hp"></div>
+        </div>
+        <span id="val-hp" class="stat-val">200/200</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9889;</span>
+        <span class="stat-name">SPEED</span>
+        <span id="val-spd" class="stat-val">100%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9678;</span>
+        <span class="stat-name">FIRE RATE</span>
+        <span id="val-atk" class="stat-val">1.20/s</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9670;</span>
+        <span class="stat-name">DAMAGE</span>
+        <span id="val-dmg" class="stat-val">10</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#10022;</span>
+        <span class="stat-name">CRIT %</span>
+        <span id="val-crit" class="stat-val">5%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9733;</span>
+        <span class="stat-name">CRIT DMG</span>
+        <span id="val-cdmg" class="stat-val">150%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#10148;</span>
+        <span class="stat-name">SHOT SPD</span>
+        <span id="val-bspd" class="stat-val">100%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9737;</span>
+        <span class="stat-name">WEAPON</span>
+        <span id="val-weapon" class="stat-val" style="min-width:0;flex:1;text-align:right">&mdash;</span>
+      </div>
+    </div>
+
+    <div id="ws-status">&#9675; Disconnected</div>
+    <div id="no-hand-hint">No hand &mdash; use WASD / arrows</div>
+  </div>
+
+  <div id="wave-announce">&mdash; WAVE <span id="wa-num">1</span> &mdash;</div>
+
+  <div id="hand-viewer">
+    <div class="panel-heading">&#9672; HAND TRACKER</div>
+    <div id="hand-canvas-wrap"></div>
+  </div>
+
+  <!-- Weapon selection -->
+  <div id="weapon-overlay">
+    <div id="weapon-modal">
+      <div id="weapon-title">&#9881; &nbsp; CHOOSE YOUR ARMAMENT &nbsp; &#9881;</div>
+      <div id="weapon-cards"></div>
+      <div class="gesture-row">
+        <span class="gesture-tag" id="gh-1">&#9757; 1 finger &rarr; card 1</span>
+        <span class="gesture-tag" id="gh-2">&#9999; 2 fingers &rarr; card 2</span>
+        <span class="gesture-tag" id="gh-3">&#128400; 3 fingers &rarr; card 3</span>
+      </div>
+      <div id="gesture-bar-wrap"><div id="gesture-bar"></div></div>
+      <div class="overlay-hint">CLICK A CARD &mdash; OR USE FINGER GESTURE</div>
+    </div>
+  </div>
+
+  <!-- Upgrade selection -->
+  <div id="upgrade-overlay">
+    <div id="upgrade-modal">
+      <div id="upgrade-title">&#9881; &nbsp; CHOOSE AN UPGRADE &nbsp; &#9881;</div>
+      <div id="upgrade-cards"></div>
+      <div class="gesture-row">
+        <span class="gesture-tag" id="ugh-1">&#9757; 1 finger &rarr; card 1</span>
+        <span class="gesture-tag" id="ugh-2">&#9999; 2 fingers &rarr; card 2</span>
+        <span class="gesture-tag" id="ugh-3">&#128400; 3 fingers &rarr; card 3</span>
+      </div>
+      <div id="upgrade-gesture-bar-wrap"><div id="upgrade-gesture-bar"></div></div>
+      <div class="overlay-hint">CLICK A CARD &mdash; OR USE FINGER GESTURE</div>
+    </div>
+  </div>
+
+  <!-- Gesture confirmation dialog -->
+  <div id="confirm-overlay">
+    <div id="confirm-modal">
+      <div id="confirm-header">YOU CHOSE</div>
+      <div id="confirm-card-name">Iron Cannon</div>
+      <div id="confirm-question">ARE YOU SURE?</div>
+      <div id="confirm-options">
+        <div class="confirm-opt" id="confirm-yes">
+          <span class="confirm-gesture-icon">&#128077;</span>
+          <span class="confirm-label">THUMBS UP</span>
+          <span class="confirm-action">YES, CONFIRM</span>
+        </div>
+        <div class="confirm-divider"></div>
+        <div class="confirm-opt" id="confirm-no">
+          <span class="confirm-gesture-icon">&#128078;</span>
+          <span class="confirm-label">THUMBS DOWN</span>
+          <span class="confirm-action">NO, GO BACK</span>
+        </div>
+      </div>
+      <div id="confirm-thumb-bar-wrap"><div id="confirm-thumb-bar"></div></div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause-overlay">
+    <div class="center-modal">
+      <div class="modal-title">&mdash; PAUSED &mdash;</div>
+      <div class="modal-sub">PRESS P TO RESUME</div>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover-overlay">
+    <div class="center-modal">
+      <div class="modal-title danger">SHIP DESTROYED</div>
+      <div id="go-score">SCORE: 00000</div>
+      <div id="go-highscore">BEST: 00000</div>
+      <div id="go-wave">REACHED WAVE 1</div>
+      <button id="restart-btn">[ ENGAGE AGAIN ]</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

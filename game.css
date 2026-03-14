@@ -1,0 +1,369 @@
+/* ================================================================
+   GAME.CSS — Steam Punk Aesthetic
+   Palette: copper #c8860a, brass #e8a020, rust #c04020,
+            iron #1a1008, iron-light #3a2010, silver #a09070
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --copper:      #c8860a;
+  --brass:       #e8a020;
+  --dk-copper:   #8b5e0a;
+  --rust:        #c04020;
+  --iron:        #1a1008;
+  --iron-mid:    #2a1a0a;
+  --iron-light:  #3a2010;
+  --silver:      #a09070;
+  --bg:          #09070a;
+  --panel-bg:    rgba(18, 11, 4, 0.92);
+  --text:        #d4b070;
+  --text-dim:    #6a5030;
+  --text-bright: #f0d090;
+  --green-hp:    #5a8030;
+  --font-title:  'Cinzel', 'Palatino Linotype', Palatino, serif;
+  --font-mono:   'Share Tech Mono', 'Courier New', Courier, monospace;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  color: var(--text);
+  user-select: none;
+}
+
+#gc {
+  position: absolute;
+  top: 0; left: 0;
+  display: block;
+  z-index: 0;
+}
+
+/* ================================================================
+   HUD
+   ================================================================ */
+#hud {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#top-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 54px;
+  background: rgba(9, 7, 10, 0.94);
+  border-bottom: 1px solid var(--dk-copper);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+}
+
+#wave-display, #score-display, #timer-display {
+  display: flex; align-items: center; gap: 10px;
+}
+.top-label { font-size: 9px; letter-spacing: 3px; color: var(--text-dim); }
+
+#wave-num, #score-num {
+  font-family: var(--font-title);
+  font-size: 24px; letter-spacing: 3px; color: var(--brass);
+}
+#timer-num {
+  font-size: 18px; letter-spacing: 2px; color: var(--copper);
+  min-width: 30px; text-align: right;
+}
+#timer-num.warning { color: var(--rust); animation: pulse-warn 0.5s infinite alternate; }
+
+@keyframes pulse-warn { from { opacity: 1; } to { opacity: 0.5; } }
+
+#timer-track {
+  width: 110px; height: 6px;
+  background: var(--iron-light);
+  border: 1px solid var(--dk-copper);
+  border-radius: 1px; overflow: hidden;
+}
+#timer-fill {
+  height: 100%; width: 100%;
+  background: var(--copper); border-radius: 1px; transition: background 0.3s;
+}
+#timer-fill.warning { background: var(--rust); }
+
+/* ---- Stats panel (left) ---- */
+#stats-panel {
+  position: absolute;
+  top: 64px; left: 14px;
+  width: 225px;
+  background: var(--panel-bg);
+  border: 1px solid var(--iron-light);
+  border-top: 2px solid var(--dk-copper);
+  padding: 12px 14px;
+}
+
+.panel-heading {
+  font-family: var(--font-title);
+  font-size: 10px; letter-spacing: 3px; color: var(--copper);
+  text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--iron-light);
+  margin-bottom: 10px;
+}
+
+.stat-row { display: flex; align-items: center; gap: 7px; padding: 3px 0; }
+.stat-icon { color: var(--copper); font-size: 12px; width: 15px; text-align: center; flex-shrink: 0; }
+.stat-name { color: var(--text-dim); font-size: 9px; letter-spacing: 2px; flex: 1; }
+
+/* HP bar — layered: ghost behind, main on top */
+.bar-wrap {
+  position: relative;
+  width: 52px; height: 4px;
+  background: var(--iron-light); border-radius: 1px; overflow: hidden; flex-shrink: 0;
+}
+.bar {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.25s, background 0.25s;
+}
+.hp-ghost {
+  background: rgba(200, 80, 20, 0.55);
+  transition: width 0.6s ease-out;
+  z-index: 1;
+}
+.bar.hp {
+  background: var(--green-hp);
+  z-index: 2;
+}
+.bar.hp.critical { background: var(--rust); }
+
+.stat-val {
+  font-size: 11px; color: var(--text-bright);
+  min-width: 54px; text-align: right; flex-shrink: 0;
+}
+
+#ws-status {
+  position: absolute; bottom: 14px; left: 18px;
+  font-size: 10px; letter-spacing: 2px; color: var(--text-dim);
+}
+#ws-status.connected { color: #608040; }
+
+#no-hand-hint {
+  position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 2px; color: var(--text-dim);
+  display: none; white-space: nowrap;
+}
+
+/* ================================================================
+   WAVE ANNOUNCE
+   ================================================================ */
+#wave-announce {
+  position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-title); font-size: 30px; letter-spacing: 8px; color: var(--brass);
+  pointer-events: none; z-index: 25; opacity: 0; transition: opacity 0.35s;
+  white-space: nowrap; text-shadow: 0 0 24px rgba(232,160,32,0.35);
+}
+#wave-announce.show { opacity: 1; }
+
+/* ================================================================
+   HAND VIEWER (bottom-right)
+   ================================================================ */
+#hand-viewer {
+  position: absolute; bottom: 50px; right: 14px;
+  width: 214px;
+  background: var(--panel-bg);
+  border: 1px solid var(--iron-light); border-top: 2px solid var(--dk-copper);
+  z-index: 20; pointer-events: none; overflow: hidden;
+}
+#hand-canvas-wrap {
+  width: 214px; height: 158px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5,3,8,0.6);
+}
+#hand-canvas-wrap canvas { display: block; }
+
+/* ================================================================
+   OVERLAYS
+   ================================================================ */
+#weapon-overlay, #upgrade-overlay, #pause-overlay,
+#gameover-overlay, #confirm-overlay {
+  display: none;
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 50;
+  background: rgba(9, 7, 10, 0.90);
+  align-items: center; justify-content: center; flex-direction: column;
+}
+#weapon-overlay.visible, #upgrade-overlay.visible,
+#pause-overlay.visible, #gameover-overlay.visible,
+#confirm-overlay.visible { display: flex; }
+
+#weapon-modal, #upgrade-modal {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 22px; max-width: 960px; width: 92%;
+}
+#weapon-title, #upgrade-title {
+  font-family: var(--font-title); font-size: 18px; letter-spacing: 5px; color: var(--brass);
+}
+#weapon-cards, #upgrade-cards {
+  display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
+}
+.overlay-hint { font-size: 10px; letter-spacing: 3px; color: var(--text-dim); }
+
+/* ---- Gesture row (shown below cards) ---- */
+.gesture-row {
+  display: flex; gap: 24px; align-items: center;
+}
+.gesture-tag {
+  font-size: 10px; letter-spacing: 1px; color: var(--text-dim);
+  padding: 4px 10px;
+  border: 1px solid var(--iron-light);
+  border-radius: 2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.gesture-tag.active {
+  color: var(--brass);
+  border-color: var(--copper);
+}
+
+/* Gesture progress bar */
+#gesture-bar-wrap, #upgrade-gesture-bar-wrap, #confirm-thumb-bar-wrap {
+  width: 260px; height: 3px;
+  background: var(--iron-light);
+  border-radius: 2px; overflow: hidden;
+}
+#gesture-bar, #upgrade-gesture-bar, #confirm-thumb-bar {
+  height: 100%; width: 0%;
+  background: var(--copper);
+  border-radius: 2px;
+  transition: width 0.05s linear;
+}
+
+/* ---- Cards ---- */
+.upgrade-card {
+  width: 200px;
+  background: var(--panel-bg);
+  border: 1px solid var(--iron-light); border-top: 2px solid var(--dk-copper);
+  padding: 20px 14px 16px;
+  cursor: pointer; pointer-events: all;
+  text-align: center;
+  transition: border-color 0.18s, transform 0.18s, opacity 0.18s;
+  position: relative;
+}
+.upgrade-card:hover:not(.locked) {
+  border-color: var(--brass); border-top-color: var(--brass); transform: translateY(-5px);
+}
+/* Gesture highlights */
+.upgrade-card.gesture-hover {
+  border-color: var(--copper);
+  border-top-color: var(--copper);
+  box-shadow: 0 0 12px rgba(200,134,10,0.25);
+  transform: translateY(-3px);
+}
+.upgrade-card.gesture-active {
+  border-color: var(--brass);
+  border-top-color: var(--brass);
+  box-shadow: 0 0 18px rgba(232,160,32,0.35);
+  transform: translateY(-6px);
+}
+
+/* Locked weapon card */
+.upgrade-card.locked {
+  opacity: 0.42;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.upgrade-card.locked::after {
+  content: 'LOCKED';
+  position: absolute; top: 8px; right: 8px;
+  font-family: var(--font-mono);
+  font-size: 8px; letter-spacing: 2px;
+  color: var(--rust);
+  border: 1px solid var(--rust);
+  padding: 1px 5px;
+}
+
+.weapon-card { width: 220px; }
+
+.card-icon  { font-size: 28px; display: block; margin-bottom: 10px; }
+.card-name  { font-family: var(--font-title); font-size: 11px; letter-spacing: 2px; color: var(--brass); margin-bottom: 7px; }
+.card-desc  { font-size: 9px; letter-spacing: 1px; color: var(--text-dim); line-height: 1.7; margin-bottom: 12px; }
+.card-stat  { font-family: var(--font-title); font-size: 13px; color: #8ec040; }
+.card-stat2 { font-size: 9px; letter-spacing: 1px; color: var(--text-dim); margin-top: 5px; }
+.card-unlock{ font-size: 9px; letter-spacing: 1px; color: var(--rust); margin-top: 6px; }
+
+/* ---- Pause + Game over modals ---- */
+.center-modal { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+.modal-title {
+  font-family: var(--font-title); font-size: 52px; letter-spacing: 8px; color: var(--brass);
+}
+.modal-title.danger { color: var(--rust); }
+.modal-sub { font-size: 12px; letter-spacing: 4px; color: var(--text-dim); }
+
+#go-score {
+  font-family: var(--font-title); font-size: 26px; letter-spacing: 4px; color: var(--text);
+}
+#go-highscore {
+  font-size: 13px; letter-spacing: 3px; color: var(--copper);
+}
+#go-wave { font-size: 12px; letter-spacing: 3px; color: var(--text-dim); margin-bottom: 12px; }
+
+#restart-btn {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 3px;
+  padding: 14px 44px; background: transparent;
+  border: 1px solid var(--copper); color: var(--copper); cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+#restart-btn:hover {
+  background: rgba(200,134,10,0.14); color: var(--brass); border-color: var(--brass);
+}
+
+/* ---- Confirm overlay ---- */
+#confirm-modal {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 18px; min-width: 380px;
+  background: var(--panel-bg);
+  border: 1px solid var(--iron-light);
+  border-top: 2px solid var(--dk-copper);
+  padding: 36px 40px;
+}
+#confirm-header {
+  font-size: 10px; letter-spacing: 4px; color: var(--text-dim);
+}
+#confirm-card-name {
+  font-family: var(--font-title); font-size: 22px; letter-spacing: 4px; color: var(--brass);
+}
+#confirm-question {
+  font-size: 10px; letter-spacing: 4px; color: var(--text-dim);
+}
+#confirm-options {
+  display: flex; align-items: stretch; gap: 0;
+  width: 100%;
+}
+.confirm-opt {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 16px 12px;
+  border: 1px solid var(--iron-light);
+  transition: border-color 0.2s, background 0.2s;
+}
+.confirm-opt.active-thumb {
+  border-color: var(--brass);
+  background: rgba(232,160,32,0.07);
+}
+.confirm-divider {
+  width: 1px; background: var(--iron-light);
+}
+.confirm-gesture-icon { font-size: 28px; }
+.confirm-label {
+  font-size: 9px; letter-spacing: 2px; color: var(--text-dim);
+}
+.confirm-action {
+  font-family: var(--font-title); font-size: 10px; letter-spacing: 2px; color: var(--brass);
+}
