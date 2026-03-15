@@ -156,6 +156,7 @@ let score, wave, waveTimer, shootTimer;
 let groupDir, groupX, screenFlash;
 let gameState;   // 'weapon-select'|'playing'|'upgrading'|'paused'|'gameover'
 let debugUnlockAllWeapons = false;
+let teslaBeamFx = null;
 
 // Hand tracking — set by WebSocket from index fingertip (landmark 8)
 let fingerRawX = null;   // remapped [0,1]
@@ -364,8 +365,9 @@ function initGame() {
   groupX      = 0;
   screenFlash = 0;
   gameState   = 'weapon-select';
+  teslaBeamFx = null;
 
-  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay'].forEach(hideOverlay);
+  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay', 'confirm-overlay'].forEach(hideOverlay);
   updateStatsPanel();
   updateTopBar();
   showWeaponSelect();
@@ -412,6 +414,34 @@ function showWeaponSelect() {
   showOverlay('weapon-overlay');
 }
 
+
+function refreshWeaponCardsUnlockedState() {
+  const cards = document.querySelectorAll('#weapon-cards .weapon-card');
+  if (!cards.length) return;
+
+  const weapons = [...WEAPONS].sort((a, b) => {
+    const al = isWeaponLocked(a) ? 1 : 0;
+    const bl = isWeaponLocked(b) ? 1 : 0;
+    if (al !== bl) return al - bl;
+    return (a.unlockScore || 0) - (b.unlockScore || 0);
+  });
+
+  cards.forEach((card, idx) => {
+    const wep = weapons[idx];
+    if (!wep) return;
+    if (isWeaponLocked(wep)) return;
+
+    card.classList.remove('locked');
+    card.querySelector('.lock-badge')?.remove();
+    card.querySelector('.lock-score')?.remove();
+
+    if (!card.dataset.unlockBound) {
+      card.addEventListener('click', () => applyWeapon(wep));
+      card.dataset.unlockBound = '1';
+    }
+  });
+}
+
 function applyWeapon(wep) {
   player.weapon   = wep.id;
   player.atkSpeed = CFG.BASE_ATK_SPEED * wep.atkMult;
@@ -453,14 +483,37 @@ function spawnWave() {
 // KEYBOARD
 // ================================================================
 const keys = new Set();
+
+function isLetterKey(e, letter) {
+  const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+  const code = typeof e.code === 'string' ? e.code : '';
+  return key === letter || code === `Key${letter.toUpperCase()}`;
+}
+
+function unlockAllWeapons() {
+  debugUnlockAllWeapons = true;
+  if (gameState === 'weapon-select') {
+    showWeaponSelect();
+  }
+  refreshWeaponCardsUnlockedState();
+}
+
 window.addEventListener('keydown', e => {
   keys.add(e.key);
-  if (e.key === 'p' || e.key === 'P') togglePause();
-  if (e.key === 'u' || e.key === 'U') {
-    debugUnlockAllWeapons = true;
-    if (gameState === 'weapon-select') showWeaponSelect();
+
+  if (isLetterKey(e, 'p')) {
+    togglePause();
+    return;
   }
-  if ((e.key === 'r' || e.key === 'R') && gameState === 'gameover') initGame();
+
+  if (isLetterKey(e, 'u')) {
+    unlockAllWeapons();
+    return;
+  }
+
+  if (isLetterKey(e, 'r')) {
+    initGame();
+  }
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
@@ -475,10 +528,79 @@ function calcDamage(dmgMult = 1.0) {
   return Math.round(player.damage * dmgMult * (_lastCrit ? player.critMult : 1));
 }
 
-function fireBullet(x, y, angle, dmgMult) {
+function fireBullet(x, y, angle, dmgMult, extra = {}) {
   const spd = CFG.PLAYER_BULLET_BASE_SPD * player.bulletSpeed;
+  const baseDmg = calcDamage(dmgMult);
+  const dmgScale = typeof extra.dmgScale === 'number' ? extra.dmgScale : 1.0;
+  const dmg = Math.max(1, Math.round(baseDmg * dmgScale));
+  bullets.push({
+    x,
+    y,
+    vx: Math.cos(angle) * spd,
+    vy: Math.sin(angle) * spd,
+    angle,
+    dmg,
+    crit: _lastCrit,
+    hitR: 4,
+    type: 'normal',
+    ...extra,
+  });
+}
+
+function findClosestEnemy(x, y, skipEnemy = null) {
+  let best = null;
+  let bestD2 = Infinity;
+  for (const e of enemies) {
+    if (e === skipEnemy) continue;
+    const ex = e.baseX + groupX;
+    const dx = ex - x;
+    const dy = e.y - y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = e;
+    }
+  }
+  return best;
+}
+
+function setBulletAngleFromVelocity(b) {
+  b.angle = Math.atan2(b.vy, b.vx);
+}
+
+function scaleRicochetBullet(b) {
+  b.ricochetCount = (b.ricochetCount || 0) + 1;
+  b.hitR = Math.min(18, (b.hitR || 4) + 3);
+  b.drawR = Math.min(15, (b.drawR || 6) + 2);
+  b.dmg = Math.max(1, Math.round(b.dmg * 1.20));
+}
+
+function fireTeslaBeam(dmgMult) {
+  const bx = player.x;
+  const by = player.y - player.size * 0.8;
   const dmg = calcDamage(dmgMult);
-  bullets.push({ x, y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd, dmg, crit: _lastCrit });
+  const beamHalfW = 26;
+
+  for (let ei = enemies.length - 1; ei >= 0; ei--) {
+    const e = enemies[ei];
+    const ex = e.baseX + groupX;
+    if (Math.abs(ex - bx) > e.r + beamHalfW) continue;
+    if (e.y > by) continue;
+
+    e.hp -= dmg;
+    e.flash = 1.0;
+    spawnDmgNumber(ex + (Math.random() - 0.5) * 16, e.y - e.r - 6, dmg, _lastCrit);
+    if (e.hp <= 0) {
+      spawnParticles(ex, e.y, '#60e8ff', 10);
+      spawnParticles(ex, e.y, '#c8f8ff', 6);
+      if (Math.random() < CFG.ORB_DROP_CHANCE) spawnOrb(ex, e.y);
+      enemies.splice(ei, 1);
+      score += 10 * wave;
+      updateTopBar();
+    }
+  }
+
+  teslaBeamFx = { x: bx, y0: by, y1: GH * 0.04, t: 0.12 };
 }
 
 function spawnWeaponBullets() {
@@ -494,6 +616,13 @@ function spawnWeaponBullets() {
     fireBullet(bx, by, -Math.PI / 2 - s, mult);
     fireBullet(bx, by, -Math.PI / 2,      mult);
     fireBullet(bx, by, -Math.PI / 2 + s,  mult);
+  } else if (player.weapon === 'aether') {
+    fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: 8.8, drawL: 14, drawW: 6, hitR: 5 });
+  } else if (player.weapon === 'ricochet') {
+    const wobble = (Math.random() - 0.5) * 0.55;
+    fireBullet(bx, by, -Math.PI / 2 + wobble, mult, { type: 'ricochet', bouncesLeft: 2, dmgScale: 0.75, drawR: 6, hitR: 6, spin: 0 });
+  } else if (player.weapon === 'tesla') {
+    fireTeslaBeam(mult);
   } else {
     fireBullet(bx, by, -Math.PI / 2, mult);
     player.burstTimer = 0.13;
@@ -543,6 +672,11 @@ function update(dt) {
   updateShip(dt);
   updateParallax(dt);
 
+  if (teslaBeamFx) {
+    teslaBeamFx.t -= dt;
+    if (teslaBeamFx.t <= 0) teslaBeamFx = null;
+  }
+
   // Auto-shoot
   shootTimer -= dt;
   if (shootTimer <= 0) {
@@ -585,9 +719,52 @@ function update(dt) {
   }
 
   // Bullets
-  for (const b of bullets)  { b.x += b.vx * dt;  b.y += b.vy * dt; }
+  for (const b of bullets) {
+    if (b.type === 'homing' && enemies.length > 0) {
+      const target = findClosestEnemy(b.x, b.y);
+      if (target) {
+        const tx = target.baseX + groupX;
+        const ty = target.y;
+        const desired = Math.atan2(ty - b.y, tx - b.x);
+        const current = Math.atan2(b.vy, b.vx);
+        let delta = desired - current;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        const turn = Math.max(-b.turnRate * dt, Math.min(b.turnRate * dt, delta));
+        const next = current + turn;
+        const speed = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(next) * speed;
+        b.vy = Math.sin(next) * speed;
+        setBulletAngleFromVelocity(b);
+      }
+    }
+
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    setBulletAngleFromVelocity(b);
+
+    if (b.type === 'ricochet') {
+      if (b.x < 8 || b.x > GW - 8) {
+        b.vx *= -1;
+        b.bouncesLeft--;
+        scaleRicochetBullet(b);
+        setBulletAngleFromVelocity(b);
+      }
+      if (b.y < 8) {
+        b.vy = Math.abs(b.vy);
+        b.bouncesLeft--;
+        scaleRicochetBullet(b);
+        setBulletAngleFromVelocity(b);
+      }
+      b.spin = (b.spin || 0) + dt * 10;
+    }
+  }
   for (const b of eBullets) { b.x += b.vx * dt;  b.y += b.vy * dt; }
-  for (let i = bullets.length  - 1; i >= 0; i--) { if (bullets[i].y  < -30 || bullets[i].x < -30 || bullets[i].x > GW + 30)  bullets.splice(i, 1); }
+  for (let i = bullets.length  - 1; i >= 0; i--) {
+    const b = bullets[i];
+    if (b.type === 'ricochet' && b.bouncesLeft < 0) { bullets.splice(i, 1); continue; }
+    if (b.y < -30 || b.x < -30 || b.x > GW + 30 || b.y > GH + 30) bullets.splice(i, 1);
+  }
   for (let i = eBullets.length - 1; i >= 0; i--) { const b = eBullets[i]; if (b.x < -30 || b.x > GW + 30 || b.y < -30 || b.y > GH + 30) eBullets.splice(i, 1); }
 
   checkBulletEnemyHits();
@@ -637,28 +814,50 @@ function updateShip(dt) {
 function checkBulletEnemyHits() {
   for (let bi = bullets.length - 1; bi >= 0; bi--) {
     const b = bullets[bi];
-    let hit = false;
+    let consumed = false;
+
     for (let ei = enemies.length - 1; ei >= 0; ei--) {
       const e  = enemies[ei];
       const ex = e.baseX + groupX;
-      const dx = b.x - ex, dy = b.y - e.y;
-      if (dx * dx + dy * dy < (e.r + 4) ** 2) {
-        e.hp   -= b.dmg;
-        e.flash = 1.0;
-        spawnDmgNumber(ex + (Math.random() - 0.5) * 18, e.y - e.r - 6, b.dmg, b.crit);
-        hit = true;
-        if (e.hp <= 0) {
-          spawnParticles(ex, e.y, '#c8860a', 12);
-          spawnParticles(ex, e.y, '#e04010',  5);
-          if (Math.random() < CFG.ORB_DROP_CHANCE) spawnOrb(ex, e.y);
-          enemies.splice(ei, 1);
-          score += 10 * wave;
-          updateTopBar();
-        }
-        break;
+      const dx = b.x - ex;
+      const dy = b.y - e.y;
+      const hitR = b.hitR || 4;
+      if (dx * dx + dy * dy >= (e.r + hitR) ** 2) continue;
+
+      e.hp   -= b.dmg;
+      e.flash = 1.0;
+      spawnDmgNumber(ex + (Math.random() - 0.5) * 18, e.y - e.r - 6, b.dmg, b.crit);
+
+      if (e.hp <= 0) {
+        spawnParticles(ex, e.y, '#c8860a', 12);
+        spawnParticles(ex, e.y, '#e04010',  5);
+        if (Math.random() < CFG.ORB_DROP_CHANCE) spawnOrb(ex, e.y);
+        enemies.splice(ei, 1);
+        score += 10 * wave;
+        updateTopBar();
       }
+
+      if (b.type === 'ricochet' && b.bouncesLeft > 0) {
+        b.bouncesLeft--;
+        const nt = findClosestEnemy(b.x, b.y, e);
+        const ang = nt
+          ? Math.atan2(nt.y - b.y, (nt.baseX + groupX) - b.x)
+          : Math.atan2(-b.vy, -b.vx) + (Math.random() - 0.5) * 0.5;
+        const speed = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(ang) * speed;
+        b.vy = Math.sin(ang) * speed;
+        scaleRicochetBullet(b);
+        setBulletAngleFromVelocity(b);
+        b.x += b.vx * 0.012;
+        b.y += b.vy * 0.012;
+      } else {
+        consumed = true;
+      }
+
+      break;
     }
-    if (hit) bullets.splice(bi, 1);
+
+    if (consumed) bullets.splice(bi, 1);
   }
 }
 
@@ -1012,8 +1211,65 @@ function drawFingertipCursor() {
 }
 
 // Player bullet — brass capsule (pixel style)
+function drawTeslaBeam() {
+  if (!teslaBeamFx) return;
+  const a = Math.max(0, teslaBeamFx.t / 0.12);
+
+  ctx.save();
+  ctx.globalAlpha = 0.35 * a;
+  ctx.strokeStyle = '#60e8ff';
+  ctx.lineWidth = 28;
+  ctx.beginPath();
+  ctx.moveTo(teslaBeamFx.x, teslaBeamFx.y0);
+  ctx.lineTo(teslaBeamFx.x, teslaBeamFx.y1);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.92 * a;
+  ctx.strokeStyle = '#d8ffff';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(teslaBeamFx.x, teslaBeamFx.y0);
+  ctx.lineTo(teslaBeamFx.x, teslaBeamFx.y1);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawPlayerBullet(b) {
   const px = Math.round(b.x), py = Math.round(b.y);
+
+  if (b.type === 'homing') {
+    const ang = typeof b.angle === 'number' ? b.angle : -Math.PI / 2;
+    const bodyL = b.drawL || 14;
+    const bodyW = b.drawW || 6;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(ang + Math.PI / 2);
+    ctx.fillStyle = '#7cc0ff';
+    ctx.fillRect(-bodyW / 2, -bodyL / 2, bodyW, bodyL - 2);
+    ctx.fillStyle = 'rgba(210,235,255,0.85)';
+    ctx.fillRect(-2, -bodyL / 2 - 2, 4, 4);
+    ctx.restore();
+    return;
+  }
+
+  if (b.type === 'ricochet') {
+    const r = b.drawR || 6;
+    const spin = b.spin || 0;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(spin);
+    ctx.fillStyle = '#e0b060';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,220,160,0.85)';
+    ctx.beginPath();
+    ctx.arc(r * 0.35, -r * 0.35, Math.max(2, r * 0.35), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
   ctx.fillStyle = '#e8a020';
   ctx.fillRect(px - 2, py - 14, 4, 12);
   ctx.fillStyle = 'rgba(255,240,150,0.65)';
@@ -1066,6 +1322,9 @@ function draw() {
     ctx.fillStyle = `rgba(200,40,20,${screenFlash * 0.28})`;
     ctx.fillRect(0, 0, GW, GH);
   }
+
+  // Tesla beam
+  drawTeslaBeam();
 
   // Player bullets
   for (const b of bullets)  drawPlayerBullet(b);
