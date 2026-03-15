@@ -453,14 +453,27 @@ function spawnWave() {
 // KEYBOARD
 // ================================================================
 const keys = new Set();
+
+function unlockAllWeapons() {
+  if (debugUnlockAllWeapons) return;
+  debugUnlockAllWeapons = true;
+  if (gameState === 'weapon-select') showWeaponSelect();
+}
+
 window.addEventListener('keydown', e => {
   keys.add(e.key);
-  if (e.key === 'p' || e.key === 'P') togglePause();
-  if (e.key === 'u' || e.key === 'U') {
-    debugUnlockAllWeapons = true;
-    if (gameState === 'weapon-select') showWeaponSelect();
+
+  if (e.code === 'KeyP') {
+    togglePause();
+    return;
   }
-  if ((e.key === 'r' || e.key === 'R') && gameState === 'gameover') initGame();
+
+  if (e.code === 'KeyU') {
+    unlockAllWeapons();
+    return;
+  }
+
+  if (e.code === 'KeyR' && gameState === 'gameover') initGame();
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
