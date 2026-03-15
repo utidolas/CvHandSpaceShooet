@@ -11,9 +11,12 @@
 </head>
 <body>
 
+  <!-- Pixel-art game canvas — JS sets 320×180, CSS upscales it -->
   <canvas id="gc"></canvas>
 
+  <!-- HUD lives at full viewport resolution, overlaid on top -->
   <div id="hud">
+
     <div id="top-bar">
       <div id="wave-display">
         <span class="top-label">WAVE</span>
@@ -32,13 +35,11 @@
 
     <div id="stats-panel">
       <div class="panel-heading">&#9881; PILOT STATS</div>
+
       <div class="stat-row">
         <span class="stat-icon">&#9829;</span>
         <span class="stat-name">HULL</span>
-        <div class="bar-wrap">
-          <div id="hp-ghost" class="bar hp-ghost"></div>
-          <div id="hp-fill"  class="bar hp"></div>
-        </div>
+        <div class="bar-wrap"><div id="hp-fill" class="bar hp"></div></div>
         <span id="val-hp" class="stat-val">200/200</span>
       </div>
       <div class="stat-row">
@@ -49,7 +50,7 @@
       <div class="stat-row">
         <span class="stat-icon">&#9678;</span>
         <span class="stat-name">FIRE RATE</span>
-        <span id="val-atk" class="stat-val">1.20/s</span>
+        <span id="val-atk" class="stat-val">0.80/s</span>
       </div>
       <div class="stat-row">
         <span class="stat-icon">&#9670;</span>
@@ -66,20 +67,23 @@
         <span class="stat-name">CRIT DMG</span>
         <span id="val-cdmg" class="stat-val">150%</span>
       </div>
+      <!-- New: bullet speed -->
       <div class="stat-row">
         <span class="stat-icon">&#10148;</span>
         <span class="stat-name">SHOT SPD</span>
         <span id="val-bspd" class="stat-val">100%</span>
       </div>
-      <div class="stat-row">
+      <!-- Current weapon label -->
+      <div class="stat-row" id="weapon-row">
         <span class="stat-icon">&#9737;</span>
         <span class="stat-name">WEAPON</span>
-        <span id="val-weapon" class="stat-val" style="min-width:0;flex:1;text-align:right">&mdash;</span>
+        <span id="val-weapon" class="stat-val" style="min-width:0;flex:1;text-align:right">—</span>
       </div>
     </div>
 
     <div id="ws-status">&#9675; Disconnected</div>
-    <div id="no-hand-hint">No hand &mdash; use WASD / arrows</div>
+    <div id="no-hand-hint">No hand detected &mdash; use WASD / arrows</div>
+
   </div>
 
   <div id="wave-announce">&mdash; WAVE <span id="wa-num">1</span> &mdash;</div>
@@ -89,60 +93,64 @@
     <div id="hand-canvas-wrap"></div>
   </div>
 
-  <!-- Weapon selection -->
+  <!-- Weapon selection overlay -->
   <div id="weapon-overlay">
     <div id="weapon-modal">
       <div id="weapon-title">&#9881; &nbsp; CHOOSE YOUR ARMAMENT &nbsp; &#9881;</div>
       <div id="weapon-cards"></div>
-      <div class="gesture-row">
-        <span class="gesture-tag" id="gh-1">&#9757; 1 finger &rarr; card 1</span>
-        <span class="gesture-tag" id="gh-2">&#9999; 2 fingers &rarr; card 2</span>
-        <span class="gesture-tag" id="gh-3">&#128400; 3 fingers &rarr; card 3</span>
+      <div class="gesture-hint-row">
+        <span class="gesture-tag" id="wg-1">&#9757; 1 finger &rarr; card 1</span>
+        <span class="gesture-tag" id="wg-2">&#9999; 2 fingers &rarr; card 2</span>
+        <span class="gesture-tag" id="wg-3">&#128400; 3 fingers &rarr; card 3</span>
+        <span class="gesture-tag" id="wg-fist">&#9994; fist &rarr; hover click</span>
       </div>
-      <div id="gesture-bar-wrap"><div id="gesture-bar"></div></div>
-      <div class="overlay-hint">CLICK A CARD &mdash; OR USE FINGER GESTURE</div>
+      <div class="gesture-hold-wrap"><div id="wg-bar" class="gesture-hold-bar"></div></div>
+      <div class="overlay-hint">HOLD GESTURE OR POINT &amp; FIST TO SELECT</div>
     </div>
   </div>
 
-  <!-- Upgrade selection -->
+  <!-- Upgrade selection overlay -->
   <div id="upgrade-overlay">
     <div id="upgrade-modal">
       <div id="upgrade-title">&#9881; &nbsp; CHOOSE AN UPGRADE &nbsp; &#9881;</div>
       <div id="upgrade-cards"></div>
-      <div class="gesture-row">
-        <span class="gesture-tag" id="ugh-1">&#9757; 1 finger &rarr; card 1</span>
-        <span class="gesture-tag" id="ugh-2">&#9999; 2 fingers &rarr; card 2</span>
-        <span class="gesture-tag" id="ugh-3">&#128400; 3 fingers &rarr; card 3</span>
+      <div class="gesture-hint-row">
+        <span class="gesture-tag" id="ug-1">&#9757; 1 finger &rarr; card 1</span>
+        <span class="gesture-tag" id="ug-2">&#9999; 2 fingers &rarr; card 2</span>
+        <span class="gesture-tag" id="ug-3">&#128400; 3 fingers &rarr; card 3</span>
+        <span class="gesture-tag" id="ug-fist">&#9994; fist &rarr; hover click</span>
       </div>
-      <div id="upgrade-gesture-bar-wrap"><div id="upgrade-gesture-bar"></div></div>
-      <div class="overlay-hint">CLICK A CARD &mdash; OR USE FINGER GESTURE</div>
+      <div class="gesture-hold-wrap"><div id="ug-bar" class="gesture-hold-bar"></div></div>
+      <div class="overlay-hint">HOLD GESTURE OR POINT &amp; FIST TO SELECT</div>
     </div>
   </div>
 
-  <!-- Gesture confirmation dialog -->
+  <!-- Gesture confirmation popup -->
   <div id="confirm-overlay">
     <div id="confirm-modal">
-      <div id="confirm-header">YOU CHOSE</div>
-      <div id="confirm-card-name">Iron Cannon</div>
-      <div id="confirm-question">ARE YOU SURE?</div>
+      <div class="confirm-header-text">YOU CHOSE</div>
+      <div id="confirm-card-name">—</div>
+      <div class="confirm-question">ARE YOU SURE?</div>
       <div id="confirm-options">
-        <div class="confirm-opt" id="confirm-yes">
-          <span class="confirm-gesture-icon">&#128077;</span>
-          <span class="confirm-label">THUMBS UP</span>
-          <span class="confirm-action">YES, CONFIRM</span>
+        <div class="confirm-opt" id="conf-yes">
+          <span class="conf-thumb">&#128077;</span>
+          <span class="conf-label">THUMBS UP</span>
+          <span class="conf-action">YES — CONFIRM</span>
+          <div class="conf-bar-wrap"><div id="conf-yes-bar" class="conf-bar"></div></div>
         </div>
         <div class="confirm-divider"></div>
-        <div class="confirm-opt" id="confirm-no">
-          <span class="confirm-gesture-icon">&#128078;</span>
-          <span class="confirm-label">THUMBS DOWN</span>
-          <span class="confirm-action">NO, GO BACK</span>
+        <div class="confirm-opt" id="conf-no">
+          <span class="conf-thumb">&#128078;</span>
+          <span class="conf-label">THUMBS DOWN</span>
+          <span class="conf-action">NO — GO BACK</span>
+          <div class="conf-bar-wrap"><div id="conf-no-bar" class="conf-bar"></div></div>
         </div>
       </div>
-      <div id="confirm-thumb-bar-wrap"><div id="confirm-thumb-bar"></div></div>
+      <!-- Debug readout — shows raw thumb diff so thresholds can be tuned in CFG -->
+      <div id="confirm-debug" style="font-size:9px;letter-spacing:1px;color:#4a3020;margin-top:4px;font-family:monospace"></div>
     </div>
   </div>
 
-  <!-- Pause -->
   <div id="pause-overlay">
     <div class="center-modal">
       <div class="modal-title">&mdash; PAUSED &mdash;</div>
@@ -150,16 +158,17 @@
     </div>
   </div>
 
-  <!-- Game over -->
   <div id="gameover-overlay">
     <div class="center-modal">
       <div class="modal-title danger">SHIP DESTROYED</div>
       <div id="go-score">SCORE: 00000</div>
-      <div id="go-highscore">BEST: 00000</div>
       <div id="go-wave">REACHED WAVE 1</div>
       <button id="restart-btn">[ ENGAGE AGAIN ]</button>
     </div>
   </div>
+
+  <!-- Floating menu cursor — follows index fingertip in overlay states -->
+  <div id="menu-cursor"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="game.js"></script>
