@@ -71,6 +71,12 @@
 * browser doesnt open automatically
     * webbrowser.open_new_tab after 1.2s delay in a daemon thread
     * delay needed so HTTPServer has time to bind before browser requests the page
+* Create a rotation from aether and ricochet bullet, so the bullet always face the right direction
+* Make the richocet bullet a circle that gets bigger IF it ricochets something
+* Increase the deegre range of ricochet from 30 to 150 deegres, prioritizing the edges.
+* Display a cooldown timer for the laserbeam weapon below the player health bar
+* Create a keyboard shortcut "M" that resets the player to the main menu (weapon selection)
+* Display all the keyboard shortcuts in the bottom left, smaller font.
 
 # Game Design
 
@@ -261,3 +267,8 @@ Small 214x158px Three.js renderer in the bottom-right corner. Completely separat
 * finger detection still trips on people with very flexible fingers or unusual hand geometry -- thresholds in CFG are the first knob to turn
 * in fast waves, index fingertip position and gesture detection share the same landmark (LM8); this means if a player is doing small fast pointing movements, the finger might briefly dip below the PIP threshold and reset a gesture hold -- probably acceptable tradeoff for now
 * phase 5 will need in-game gestures (fist = shield, two fingers = boost etc) which means a second detection layer running only when not in overlay states
+* add locked weapons functionality
+
+
+
+
