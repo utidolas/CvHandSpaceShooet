@@ -365,7 +365,7 @@ function initGame() {
   screenFlash = 0;
   gameState   = 'weapon-select';
 
-  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay'].forEach(hideOverlay);
+  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay', 'confirm-overlay'].forEach(hideOverlay);
   updateStatsPanel();
   updateTopBar();
   showWeaponSelect();
@@ -412,6 +412,34 @@ function showWeaponSelect() {
   showOverlay('weapon-overlay');
 }
 
+
+function refreshWeaponCardsUnlockedState() {
+  const cards = document.querySelectorAll('#weapon-cards .weapon-card');
+  if (!cards.length) return;
+
+  const weapons = [...WEAPONS].sort((a, b) => {
+    const al = isWeaponLocked(a) ? 1 : 0;
+    const bl = isWeaponLocked(b) ? 1 : 0;
+    if (al !== bl) return al - bl;
+    return (a.unlockScore || 0) - (b.unlockScore || 0);
+  });
+
+  cards.forEach((card, idx) => {
+    const wep = weapons[idx];
+    if (!wep) return;
+    if (isWeaponLocked(wep)) return;
+
+    card.classList.remove('locked');
+    card.querySelector('.lock-badge')?.remove();
+    card.querySelector('.lock-score')?.remove();
+
+    if (!card.dataset.unlockBound) {
+      card.addEventListener('click', () => applyWeapon(wep));
+      card.dataset.unlockBound = '1';
+    }
+  });
+}
+
 function applyWeapon(wep) {
   player.weapon   = wep.id;
   player.atkSpeed = CFG.BASE_ATK_SPEED * wep.atkMult;
@@ -453,14 +481,37 @@ function spawnWave() {
 // KEYBOARD
 // ================================================================
 const keys = new Set();
+
+function isLetterKey(e, letter) {
+  const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+  const code = typeof e.code === 'string' ? e.code : '';
+  return key === letter || code === `Key${letter.toUpperCase()}`;
+}
+
+function unlockAllWeapons() {
+  debugUnlockAllWeapons = true;
+  if (gameState === 'weapon-select') {
+    showWeaponSelect();
+  }
+  refreshWeaponCardsUnlockedState();
+}
+
 window.addEventListener('keydown', e => {
   keys.add(e.key);
-  if (e.key === 'p' || e.key === 'P') togglePause();
-  if (e.key === 'u' || e.key === 'U') {
-    debugUnlockAllWeapons = true;
-    if (gameState === 'weapon-select') showWeaponSelect();
+
+  if (isLetterKey(e, 'p')) {
+    togglePause();
+    return;
   }
-  if ((e.key === 'r' || e.key === 'R') && gameState === 'gameover') initGame();
+
+  if (isLetterKey(e, 'u')) {
+    unlockAllWeapons();
+    return;
+  }
+
+  if (isLetterKey(e, 'r')) {
+    initGame();
+  }
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
