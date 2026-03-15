@@ -55,7 +55,7 @@ const CFG = {
   // ---- Phase 4: Gesture thresholds ----
   GESTURE_HOLD_FRAMES:  95,    // hold finger gesture ~3.17s to select card
   THUMB_HOLD_FRAMES:    95,    // hold thumb gesture ~3.17s to confirm/cancel (increased)
-  FIST_HOLD_FRAMES:     18,    // hold fist ~0.60s to click in menu
+  FIST_HOLD_FRAMES:     95,    // hold fist ~3.17s to click in menu
   GESTURE_COOLDOWN_MS:  1400,  // ms between any two confirmed gesture actions
   FINGER_MARGIN:        0.06,  // tip must be this far above PIP to count as extended
 
@@ -374,7 +374,7 @@ function initGame() {
 // ================================================================
 // WEAPON SELECTION
 // ================================================================
-function renderWeaponSelect() {
+function showWeaponSelect() {
   const container = document.getElementById('weapon-cards');
   container.innerHTML = '';
   const weapons = [...WEAPONS].sort((a, b) => {
@@ -409,16 +409,7 @@ function renderWeaponSelect() {
     }
     container.appendChild(card);
   }
-}
-
-function showWeaponSelect() {
-  renderWeaponSelect();
   showOverlay('weapon-overlay');
-}
-
-function unlockAllWeapons() {
-  debugUnlockAllWeapons = true;
-  renderWeaponSelect();
 }
 
 function applyWeapon(wep) {
@@ -463,11 +454,13 @@ function spawnWave() {
 // ================================================================
 const keys = new Set();
 window.addEventListener('keydown', e => {
-  const key = e.key;
-  keys.add(key);
-  if (key === 'p' || key === 'P') togglePause();
-  if (e.code === 'KeyU' || key === 'u' || key === 'U') unlockAllWeapons();
-  if ((key === 'r' || key === 'R') && gameState === 'gameover') initGame();
+  keys.add(e.key);
+  if (e.key === 'p' || e.key === 'P') togglePause();
+  if (e.key === 'u' || e.key === 'U') {
+    debugUnlockAllWeapons = true;
+    if (gameState === 'weapon-select') showWeaponSelect();
+  }
+  if ((e.key === 'r' || e.key === 'R') && gameState === 'gameover') initGame();
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
