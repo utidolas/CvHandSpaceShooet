@@ -365,7 +365,7 @@ function initGame() {
   screenFlash = 0;
   gameState   = 'weapon-select';
 
-  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay'].forEach(hideOverlay);
+  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay', 'confirm-overlay'].forEach(hideOverlay);
   updateStatsPanel();
   updateTopBar();
   showWeaponSelect();
@@ -410,6 +410,34 @@ function showWeaponSelect() {
     container.appendChild(card);
   }
   showOverlay('weapon-overlay');
+}
+
+
+function refreshWeaponCardsUnlockedState() {
+  const cards = document.querySelectorAll('#weapon-cards .weapon-card');
+  if (!cards.length) return;
+
+  const weapons = [...WEAPONS].sort((a, b) => {
+    const al = isWeaponLocked(a) ? 1 : 0;
+    const bl = isWeaponLocked(b) ? 1 : 0;
+    if (al !== bl) return al - bl;
+    return (a.unlockScore || 0) - (b.unlockScore || 0);
+  });
+
+  cards.forEach((card, idx) => {
+    const wep = weapons[idx];
+    if (!wep) return;
+    if (isWeaponLocked(wep)) return;
+
+    card.classList.remove('locked');
+    card.querySelector('.lock-badge')?.remove();
+    card.querySelector('.lock-score')?.remove();
+
+    if (!card.dataset.unlockBound) {
+      card.addEventListener('click', () => applyWeapon(wep));
+      card.dataset.unlockBound = '1';
+    }
+  });
 }
 
 function applyWeapon(wep) {
