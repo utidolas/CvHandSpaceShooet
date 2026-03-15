@@ -520,6 +520,54 @@ function calcDamage(dmgMult = 1.0) {
 
 function fireBullet(x, y, angle, dmgMult, extra = {}) {
   const spd = CFG.PLAYER_BULLET_BASE_SPD * player.bulletSpeed;
+  const baseDmg = calcDamage(dmgMult);
+  const dmgScale = typeof extra.dmgScale === 'number' ? extra.dmgScale : 1.0;
+  const dmg = Math.max(1, Math.round(baseDmg * dmgScale));
+  bullets.push({
+    x,
+    y,
+    vx: Math.cos(angle) * spd,
+    vy: Math.sin(angle) * spd,
+    angle,
+    dmg,
+    crit: _lastCrit,
+    hitR: 4,
+    type: 'normal',
+    ...extra,
+  });
+}
+
+function findClosestEnemy(x, y, skipEnemy = null) {
+  let best = null;
+  let bestD2 = Infinity;
+  for (const e of enemies) {
+    if (e === skipEnemy) continue;
+    const ex = e.baseX + groupX;
+    const dx = ex - x;
+    const dy = e.y - y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = e;
+    }
+  }
+  return best;
+}
+
+function setBulletAngleFromVelocity(b) {
+  b.angle = Math.atan2(b.vy, b.vx);
+}
+
+function scaleRicochetBullet(b) {
+  b.ricochetCount = (b.ricochetCount || 0) + 1;
+  b.hitR = Math.min(18, (b.hitR || 4) + 3);
+  b.drawR = Math.min(15, (b.drawR || 6) + 2);
+  b.dmg = Math.max(1, Math.round(b.dmg * 1.20));
+}
+
+function fireTeslaBeam(dmgMult) {
+  const bx = player.x;
+  const by = player.y - player.size * 0.8;
   const dmg = calcDamage(dmgMult);
   bullets.push({
     x,
