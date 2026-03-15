@@ -484,36 +484,26 @@ function spawnWave() {
 // ================================================================
 const keys = new Set();
 
-function isLetterKey(e, letter) {
-  const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-  const code = typeof e.code === 'string' ? e.code : '';
-  return key === letter || code === `Key${letter.toUpperCase()}`;
-}
-
 function unlockAllWeapons() {
+  if (debugUnlockAllWeapons) return;
   debugUnlockAllWeapons = true;
-  if (gameState === 'weapon-select') {
-    showWeaponSelect();
-  }
-  refreshWeaponCardsUnlockedState();
+  if (gameState === 'weapon-select') showWeaponSelect();
 }
 
 window.addEventListener('keydown', e => {
   keys.add(e.key);
 
-  if (isLetterKey(e, 'p')) {
+  if (e.code === 'KeyP') {
     togglePause();
     return;
   }
 
-  if (isLetterKey(e, 'u')) {
+  if (e.code === 'KeyU') {
     unlockAllWeapons();
     return;
   }
 
-  if (isLetterKey(e, 'r')) {
-    initGame();
-  }
+  if (e.code === 'KeyR' && gameState === 'gameover') initGame();
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
