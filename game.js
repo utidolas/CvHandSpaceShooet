@@ -5,47 +5,47 @@
 // ================================================================
 const CFG = {
   // Player base stats
-  BASE_HP:                200,
-  BASE_SPEED:             400,          // px/sec — faster than before
-  BASE_ATK_SPEED:         0.80,
-  BASE_DAMAGE:            10,
-  BASE_CRIT_CHANCE:       0.05,
+  BASE_HP:                2000,
+  BASE_SPEED:             400,         
+  BASE_ATK_SPEED:         2.0,
+  BASE_DAMAGE:            100,
+  BASE_CRIT_CHANCE:       0.15,
   BASE_CRIT_MULT:         1.50,
   BASE_BULLET_SPEED:      1.0,
 
   // Enemy scaling
-  ENEMY_BASE_HP:          30,
+  ENEMY_BASE_HP:          300,
   ENEMY_HP_SCALE:         1.28,
-  ENEMY_BASE_DMG:         15,
+  ENEMY_BASE_DMG:         250,
   ENEMY_DMG_SCALE:        1.18,
   ENEMY_SHOOT_BASE:       2.5,
-  ENEMY_SHOOT_MIN:        0.65,
-  ENEMY_SHOOT_DEC:        0.18,
+  ENEMY_SHOOT_MIN:        0.065, // minimum attack speed
+  ENEMY_SHOOT_DEC:        0.1, // enemy will gain 10% attack speed per wave
 
   // Wave
-  WAVE_TIMER:             60,
+  WAVE_TIMER:             14,
   WAVE_PENALTY:           0.05,
 
   // Formation
   ENEMY_ZONE_TOP:         0.07,
   ENEMY_ZONE_BTM:         0.46,
-  FORMATION_SPEED:        72,           // faster
+  FORMATION_SPEED:        80,          
   FORMATION_DIP:          18,
 
   // Bullets
-  PLAYER_BULLET_BASE_SPD: 820,          // faster
-  ENEMY_BULLET_SPD:       360,          // faster
+  PLAYER_BULLET_BASE_SPD: 920,         
+  ENEMY_BULLET_SPD:       360,         
 
   // Ship
   SHIP_LERP_60:           0.40,
   SHIP_ZONE_TOP:          0.50,
-  SHIP_SIZE:              22,
+  SHIP_SIZE:              18,
 
   // Health orbs
   ORB_DROP_CHANCE:        0.25,
-  ORB_HEAL_MIN:           15,
-  ORB_HEAL_MAX:           30,
-  ORB_FALL_SPEED:         110,          // full-viewport px/sec
+  ORB_HEAL_MIN:           150,
+  ORB_HEAL_MAX:           300,
+  ORB_FALL_SPEED:         240,         // full-viewport px/sec
 
   // Hand remapping — maps camera sub-range to full game range.
   // Tweak these to match your comfortable arm movement.
@@ -107,7 +107,7 @@ const WEAPONS = [
     id: 'ricochet', name: 'Ricochet Chamber',
     icon: '\u21BB', color: '#e0b060',
     desc: 'Wild angles and bounces.\nUnpredictable but deadly.',
-    dmgMult: 0.85, atkMult: 0.90,
+    dmgMult: 0.58, atkMult: 0.85,
     hint: 'Bouncing rounds',
     unlockScore: 2000,
   },
@@ -134,14 +134,14 @@ const UPGRADE_POOL = [
   { icon:'\u2699', name:'Gyro Stabiliser',   desc:'Enhanced directional control',     stat:'moveSpeed',   val:0.16, fmt:v=>`+${Math.round(v*100)}% move speed`    },
   { icon:'\u2665', name:'Boiler Plating',    desc:'Reinforce hull with iron plating', stat:'maxHp',       val:30,   fmt:v=>`+${v} max hull`                       },
   { icon:'\u2665', name:'Riveted Armour',    desc:'Extra layers of forged steel',     stat:'maxHp',       val:50,   fmt:v=>`+${v} max hull`                       },
-  { icon:'+',      name:'Emergency Steam',   desc:'Repair critical hull damage',      stat:'heal',        val:0.15, fmt:v=>`+${Math.round(v*100)}% hull restored`  },
+  { icon:'+',      name:'Emergency Steam',   desc:'Repair critical hull damage',      stat:'heal',        val:0.20, fmt:v=>`+${Math.round(v*100)}% hull restored`  },
   { icon:'\u25CE', name:'Rapid Valves',      desc:'Faster firing cycle',              stat:'atkSpeed',    val:0.12, fmt:v=>`+${v.toFixed(2)} shots/s`             },
   { icon:'\u25CE', name:'Pressure Chamber',  desc:'High-pressure shot cycle',         stat:'atkSpeed',    val:0.20, fmt:v=>`+${v.toFixed(2)} shots/s`             },
   { icon:'\u25C6', name:'Explosive Powder',  desc:'More potent propellant charge',    stat:'damage',      val:4,    fmt:v=>`+${v} base damage`                    },
   { icon:'\u25C6', name:'Refined Rounds',    desc:'Precision-machined ammunition',    stat:'damage',      val:7,    fmt:v=>`+${v} base damage`                    },
   { icon:'\u25C6', name:'Masterwork Shot',   desc:'Rare artisan-crafted shells',      stat:'damage',      val:12,   fmt:v=>`+${v} base damage`                    },
-  { icon:'\u2726', name:'Telescopic Sight',  desc:'Improved targeting optics',        stat:'critChance',  val:0.03, fmt:v=>`+${Math.round(v*100)}% crit chance`   },
-  { icon:'\u2726', name:'Precision Gauge',   desc:'Fine-tuned aiming apparatus',      stat:'critChance',  val:0.05, fmt:v=>`+${Math.round(v*100)}% crit chance`   },
+  { icon:'\u2726', name:'Telescopic Sight',  desc:'Improved targeting optics',        stat:'critChance',  val:0.05, fmt:v=>`+${Math.round(v*100)}% crit chance`   },
+  { icon:'\u2726', name:'Precision Gauge',   desc:'Fine-tuned aiming apparatus',      stat:'critChance',  val:0.10, fmt:v=>`+${Math.round(v*100)}% crit chance`   },
   { icon:'\u2605', name:'Volatile Mix',      desc:'Unstable but devastating charge',  stat:'critMult',    val:0.20, fmt:v=>`+${Math.round(v*100)}% crit damage`   },
   { icon:'\u2605', name:'Detonation Core',   desc:'Catastrophic critical strikes',    stat:'critMult',    val:0.35, fmt:v=>`+${Math.round(v*100)}% crit damage`   },
   { icon:'\u27A4', name:'Aether Propellant', desc:'Aetherium-charged powder',         stat:'bulletSpeed', val:0.15, fmt:v=>`+${Math.round(v*100)}% shot speed`    },
@@ -272,6 +272,7 @@ function initParallax() {
         y:    (i / count) * tH + Math.random() * (tH / count),
         w:    10 + Math.random() * 20,
         h:    80 + Math.random() * 140,
+        rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (0.003 + Math.random() * 0.009)
       });
     }
     return items;
@@ -291,13 +292,83 @@ function initParallax() {
     return items;
   }
 
+  function genBoilers(count) {
+    const items = [];
+    for (let i = 0; i < count; i++) {
+      items.push({
+        type: 'boiler',
+        x: 120 + Math.random() * (GW - 240),
+        y: Math.random() * tH,
+        r: 40 + Math.random() * 70,
+        ring: Math.random() > 0.5,
+        pipeAngle: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (0.003 + Math.random() * 0.009)
+      });
+    }
+    return items;
+  }
+
+  function genScrap(count){
+    const items=[];
+    for(let i=0;i<count;i++){
+      items.push({
+        type:'scrap',
+        x:Math.random()*GW,
+        y:Math.random()*tH,
+        r:10+Math.random()*26,
+        angle:Math.random()*Math.PI*2,
+        rot:(Math.random()-0.5)*0.02,
+        rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (0.003 + Math.random() * 0.009)
+      });
+    }
+    return items;
+  }
+
+  function genStars(count){
+    const items=[];
+    for(let i=0;i<count;i++){
+      items.push({
+        type:'star',
+        x:Math.random()*GW,
+        y:Math.random()*tH,
+        r:1+Math.random()*2,
+        flicker:Math.random()*Math.PI*2
+      });
+    }
+    return items;
+  }
+
+  function genGalaxies(count){
+    const items=[];
+    for(let i=0;i<count;i++){
+      items.push({
+        type:'galaxy',
+        x:Math.random()*GW,
+        y:Math.random()*tH,
+        r:80+Math.random()*140,
+        rot:Math.random()*Math.PI*2,
+        flicker:Math.random()*Math.PI*2,
+        rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (0.003 + Math.random() * 0.009) 
+      });
+    }
+    return items;
+  }
+
   parallaxLayers = [
-    // Layer 0 — far: large gear silhouettes at the edges
-    { speed: 18,  alpha: 0.040, offset: 0,                tileH: tH, items: genGears(5, 55, 90, 10, 14) },
-    // Layer 1 — mid: medium gears + pipes
-    { speed: 42,  alpha: 0.060, offset: Math.random()*GH, tileH: tH, items: [...genGears(8, 24, 46, 7, 10), ...genPipes(7)] },
-    // Layer 2 — near: ember particles
-    { speed: 85,  alpha: 0.050, offset: Math.random()*GH, tileH: tH, items: genEmbers(35) },
+    // distant furnace sky
+    { speed:110, alpha:0.20, offset:0, tileH:tH, items:[...genStars(120), ...genGalaxies(2)]},
+  
+    // industrial sky objects
+    { speed:138, alpha:0.08, offset:0, tileH:tH, items:[...genGears(4,55,90,10,14), ...genBoilers(2)]},
+  
+    // mid structures
+    { speed:162, alpha:0.22, offset:Math.random()*GH, tileH:tH, items:[...genGears(8,24,46,7,10), ...genPipes(7)]},
+  
+    // debris
+    { speed:200, alpha:0.18, offset:Math.random()*GH, tileH:tH, items:[...genScrap(22)]},
+  
+    // embers
+    { speed:235, alpha:0.14, offset:Math.random()*GH, tileH:tH, items:genEmbers(35)}
   ];
 }
 
@@ -306,6 +377,9 @@ function updateParallax(dt) {
     layer.offset = (layer.offset + layer.speed * dt) % layer.tileH;
     for (const item of layer.items) {
       if (item.type === 'gear') item.angle += item.rotSpeed;
+      if (item.type === 'scrap' || item.type === 'galaxy') item.angle += item.rotSpeed * 0.60; // 40%
+      if (item.type === 'star' || item.type === 'galaxy') item.flicker += 0.04; // flicker effect for stars and galaxies
+      if (item.type === 'boiler' || item.type === 'pipe') item.angle += item.rotSpeed * 0.85; // 15% 
     }
   }
 }
@@ -327,6 +401,74 @@ function drawParallaxItem(item, x, y) {
     ctx.fillStyle = `rgba(255,${eg},15,${ea})`;
     const er = Math.round(item.r);
     ctx.fillRect(Math.round(x - er), Math.round(y - er), er * 2, er * 2);
+  } else if (item.type === 'boiler') {
+
+    // main tank
+    ctx.beginPath();
+    ctx.arc(x, y, item.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  
+    // rivets
+    const rivets = 12;
+    for (let i=0;i<rivets;i++){
+      const a = (i/rivets)*Math.PI*2;
+      const rx = x + Math.cos(a)*(item.r*0.85);
+      const ry = y + Math.sin(a)*(item.r*0.85);
+      ctx.fillRect(rx-1, ry-1, 2, 2);
+    }
+  
+    // ring structure
+    if (item.ring){
+      ctx.beginPath();
+      ctx.ellipse(x, y, item.r*1.4, item.r*0.35, 0, 0, Math.PI*2);
+      ctx.stroke();
+    }
+  
+    // pipe sticking out
+    const px = x + Math.cos(item.pipeAngle)*item.r;
+    const py = y + Math.sin(item.pipeAngle)*item.r;
+    ctx.fillRect(px-3, py-6, 6, 12);
+  } else if (item.type === 'scrap') {
+
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(item.angle);
+  
+    ctx.beginPath();
+    ctx.moveTo(-item.r, -item.r*0.4);
+    ctx.lineTo(item.r*0.8, -item.r*0.6);
+    ctx.lineTo(item.r, item.r*0.3);
+    ctx.lineTo(-item.r*0.4, item.r);
+    ctx.closePath();
+  
+    ctx.fill();
+    ctx.stroke();
+  
+    // rivet
+    ctx.fillRect(-1,-1,2,2);
+  
+    ctx.restore();
+  } else if(item.type==='star'){
+
+    item.flicker += 0.05;
+  
+    const a = 0.4 + Math.sin(item.flicker)*0.3;
+  
+    ctx.fillStyle=`rgba(255,180,60,${a})`;
+    ctx.fillRect(x,y,item.r,item.r);
+  } else if(item.type==='galaxy'){
+
+    const g=ctx.createRadialGradient(x,y,0,x,y,item.r);
+  
+    g.addColorStop(0,'rgba(255,180,90,0.18)');
+    g.addColorStop(1,'rgba(0,0,0,0)');
+  
+    ctx.fillStyle=g;
+  
+    ctx.beginPath();
+    ctx.arc(x,y,item.r,0,Math.PI*2);
+    ctx.fill();
   }
 }
 
@@ -531,7 +673,7 @@ function fireBullet(x, y, angle, dmgMult, extra = {}) {
     angle,
     dmg,
     crit: _lastCrit,
-    hitR: 4,
+    hitR: typeof extra.hitR === 'number' ? extra.hitR : 4,
     type: 'normal',
     ...extra,
   });
@@ -560,9 +702,9 @@ function setBulletAngleFromVelocity(b) {
 
 function scaleRicochetBullet(b) {
   b.ricochetCount = (b.ricochetCount || 0) + 1;
-  b.hitR = Math.min(18, (b.hitR || 4) + 3);
-  b.drawR = Math.min(15, (b.drawR || 6) + 2);
-  b.dmg = Math.max(1, Math.round(b.dmg * 1.20));
+  b.hitR = Math.min(24, (b.hitR || 4) + 3);
+  b.drawR = Math.min(20, (b.drawR || 6) + 2);
+  b.dmg = Math.max(1, Math.round(b.dmg * 1.25));
 }
 
 function fireTeslaBeam(dmgMult) {
@@ -643,7 +785,12 @@ function spawnWeaponBullets() {
     fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: 8.8 });
   } else if (player.weapon === 'ricochet') {
     const wobble = (Math.random() - 0.5) * 0.55;
-    fireBullet(bx, by, -Math.PI / 2 + wobble, mult, { type: 'ricochet', bouncesLeft: 2 });
+    fireBullet(bx, by, -Math.PI / 2 + wobble, mult, {
+      type: 'ricochet',
+      bouncesLeft: 2,
+      hitR: 5,
+      drawR: 7,
+    });
   } else if (player.weapon === 'tesla') {
     fireTeslaBeam(mult);
   } else {
@@ -768,10 +915,12 @@ function update(dt) {
       if (b.x < 8 || b.x > GW - 8) {
         b.vx *= -1;
         b.bouncesLeft--;
+        scaleRicochetBullet(b);
       }
       if (b.y < 8) {
         b.vy = Math.abs(b.vy);
         b.bouncesLeft--;
+        scaleRicochetBullet(b);
       }
     }
   }
@@ -837,7 +986,8 @@ function checkBulletEnemyHits() {
       const ex = e.baseX + groupX;
       const dx = b.x - ex;
       const dy = b.y - e.y;
-      if (dx * dx + dy * dy >= (e.r + 4) ** 2) continue;
+      const br = b.hitR || 4;
+      if (dx * dx + dy * dy >= (e.r + br) ** 2) continue;
 
       e.hp   -= b.dmg;
       e.flash = 1.0;
@@ -863,6 +1013,7 @@ function checkBulletEnemyHits() {
         b.vy = Math.sin(ang) * speed;
         b.x += b.vx * 0.012;
         b.y += b.vy * 0.012;
+        scaleRicochetBullet(b);
       } else {
         consumed = true;
       }
@@ -1251,18 +1402,28 @@ function drawPlayerBullet(b) {
   const px = Math.round(b.x), py = Math.round(b.y);
 
   if (b.type === 'homing') {
+    const r = 6;
     ctx.fillStyle = '#7cc0ff';
-    ctx.fillRect(px - 3, py - 12, 6, 10);
+    ctx.beginPath();
+    ctx.arc(px, py - 6, r, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = 'rgba(210,235,255,0.85)';
-    ctx.fillRect(px - 2, py - 14, 4, 3);
+    ctx.beginPath();
+    ctx.arc(px + 1, py - 9, r * 0.5, 0, Math.PI * 2);
+    ctx.fill();
     return;
   }
 
   if (b.type === 'ricochet') {
+    const r = b.drawR || 7;
     ctx.fillStyle = '#e0b060';
-    ctx.fillRect(px - 3, py - 11, 6, 9);
+    ctx.beginPath();
+    ctx.arc(px, py - 6, r, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = 'rgba(255,220,160,0.80)';
-    ctx.fillRect(px - 2, py - 13, 4, 3);
+    ctx.beginPath();
+    ctx.arc(px + 1, py - 9, r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
     return;
   }
 
