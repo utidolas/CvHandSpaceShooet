@@ -484,36 +484,26 @@ function spawnWave() {
 // ================================================================
 const keys = new Set();
 
-function isLetterKey(e, letter) {
-  const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-  const code = typeof e.code === 'string' ? e.code : '';
-  return key === letter || code === `Key${letter.toUpperCase()}`;
-}
-
 function unlockAllWeapons() {
+  if (debugUnlockAllWeapons) return;
   debugUnlockAllWeapons = true;
-  if (gameState === 'weapon-select') {
-    showWeaponSelect();
-  }
-  refreshWeaponCardsUnlockedState();
+  if (gameState === 'weapon-select') showWeaponSelect();
 }
 
 window.addEventListener('keydown', e => {
   keys.add(e.key);
 
-  if (isLetterKey(e, 'p')) {
+  if (e.code === 'KeyP') {
     togglePause();
     return;
   }
 
-  if (isLetterKey(e, 'u')) {
+  if (e.code === 'KeyU') {
     unlockAllWeapons();
     return;
   }
 
-  if (isLetterKey(e, 'r')) {
-    initGame();
-  }
+  if (e.code === 'KeyR' && gameState === 'gameover') initGame();
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
@@ -579,6 +569,39 @@ function fireTeslaBeam(dmgMult) {
   const bx = player.x;
   const by = player.y - player.size * 0.8;
   const dmg = calcDamage(dmgMult);
+  bullets.push({
+    x,
+    y,
+    vx: Math.cos(angle) * spd,
+    vy: Math.sin(angle) * spd,
+    dmg,
+    crit: _lastCrit,
+    type: 'normal',
+    ...extra,
+  });
+}
+
+function findClosestEnemy(x, y, skipEnemy = null) {
+  let best = null;
+  let bestD2 = Infinity;
+  for (const e of enemies) {
+    if (e === skipEnemy) continue;
+    const ex = e.baseX + groupX;
+    const dx = ex - x;
+    const dy = e.y - y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = e;
+    }
+  }
+  return best;
+}
+
+function fireTeslaBeam(dmgMult) {
+  const bx = player.x;
+  const by = player.y - player.size * 0.8;
+  const dmg = calcDamage(dmgMult);
   const beamHalfW = 26;
 
   for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -617,10 +640,10 @@ function spawnWeaponBullets() {
     fireBullet(bx, by, -Math.PI / 2,      mult);
     fireBullet(bx, by, -Math.PI / 2 + s,  mult);
   } else if (player.weapon === 'aether') {
-    fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: 8.8, drawL: 14, drawW: 6, hitR: 5 });
+    fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: 8.8 });
   } else if (player.weapon === 'ricochet') {
     const wobble = (Math.random() - 0.5) * 0.55;
-    fireBullet(bx, by, -Math.PI / 2 + wobble, mult, { type: 'ricochet', bouncesLeft: 2, dmgScale: 0.75, drawR: 6, hitR: 6, spin: 0 });
+    fireBullet(bx, by, -Math.PI / 2 + wobble, mult, { type: 'ricochet', bouncesLeft: 2 });
   } else if (player.weapon === 'tesla') {
     fireTeslaBeam(mult);
   } else {
@@ -735,28 +758,21 @@ function update(dt) {
         const speed = Math.hypot(b.vx, b.vy);
         b.vx = Math.cos(next) * speed;
         b.vy = Math.sin(next) * speed;
-        setBulletAngleFromVelocity(b);
       }
     }
 
     b.x += b.vx * dt;
     b.y += b.vy * dt;
-    setBulletAngleFromVelocity(b);
 
     if (b.type === 'ricochet') {
       if (b.x < 8 || b.x > GW - 8) {
         b.vx *= -1;
         b.bouncesLeft--;
-        scaleRicochetBullet(b);
-        setBulletAngleFromVelocity(b);
       }
       if (b.y < 8) {
         b.vy = Math.abs(b.vy);
         b.bouncesLeft--;
-        scaleRicochetBullet(b);
-        setBulletAngleFromVelocity(b);
       }
-      b.spin = (b.spin || 0) + dt * 10;
     }
   }
   for (const b of eBullets) { b.x += b.vx * dt;  b.y += b.vy * dt; }
@@ -821,8 +837,7 @@ function checkBulletEnemyHits() {
       const ex = e.baseX + groupX;
       const dx = b.x - ex;
       const dy = b.y - e.y;
-      const hitR = b.hitR || 4;
-      if (dx * dx + dy * dy >= (e.r + hitR) ** 2) continue;
+      if (dx * dx + dy * dy >= (e.r + 4) ** 2) continue;
 
       e.hp   -= b.dmg;
       e.flash = 1.0;
@@ -846,8 +861,6 @@ function checkBulletEnemyHits() {
         const speed = Math.hypot(b.vx, b.vy);
         b.vx = Math.cos(ang) * speed;
         b.vy = Math.sin(ang) * speed;
-        scaleRicochetBullet(b);
-        setBulletAngleFromVelocity(b);
         b.x += b.vx * 0.012;
         b.y += b.vy * 0.012;
       } else {
@@ -1238,35 +1251,18 @@ function drawPlayerBullet(b) {
   const px = Math.round(b.x), py = Math.round(b.y);
 
   if (b.type === 'homing') {
-    const ang = typeof b.angle === 'number' ? b.angle : -Math.PI / 2;
-    const bodyL = b.drawL || 14;
-    const bodyW = b.drawW || 6;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(ang + Math.PI / 2);
     ctx.fillStyle = '#7cc0ff';
-    ctx.fillRect(-bodyW / 2, -bodyL / 2, bodyW, bodyL - 2);
+    ctx.fillRect(px - 3, py - 12, 6, 10);
     ctx.fillStyle = 'rgba(210,235,255,0.85)';
-    ctx.fillRect(-2, -bodyL / 2 - 2, 4, 4);
-    ctx.restore();
+    ctx.fillRect(px - 2, py - 14, 4, 3);
     return;
   }
 
   if (b.type === 'ricochet') {
-    const r = b.drawR || 6;
-    const spin = b.spin || 0;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(spin);
     ctx.fillStyle = '#e0b060';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,220,160,0.85)';
-    ctx.beginPath();
-    ctx.arc(r * 0.35, -r * 0.35, Math.max(2, r * 0.35), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    ctx.fillRect(px - 3, py - 11, 6, 9);
+    ctx.fillStyle = 'rgba(255,220,160,0.80)';
+    ctx.fillRect(px - 2, py - 13, 4, 3);
     return;
   }
 
