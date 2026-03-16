@@ -77,6 +77,10 @@
 * Display a cooldown timer for the laserbeam weapon below the player health bar
 * Create a keyboard shortcut "M" that resets the player to the main menu (weapon selection)
 * Display all the keyboard shortcuts in the bottom left, smaller font.
+* Hide option for pilot stats and hand tracker
+* Add a confirmation screen when pressing "M" and a warning "You will be redirected to the weapon selection. THIS WILL RESET YOUR CURRENT RUN, ARE YOU SURE? (Yes) (No)"
+* Change the crit damage text to RED
+* Player periodically gets teleported to top left, maybe hand tracking ?
 
 # Game Design
 

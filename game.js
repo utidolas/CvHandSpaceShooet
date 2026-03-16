@@ -7,7 +7,7 @@ const CFG = {
   // Player base stats
   BASE_HP:                2000,
   BASE_SPEED:             400,         
-  BASE_ATK_SPEED:         2.0,
+  BASE_ATK_SPEED:         2.5,
   BASE_DAMAGE:            100,
   BASE_CRIT_CHANCE:       0.15,
   BASE_CRIT_MULT:         1.50,
@@ -135,8 +135,8 @@ const UPGRADE_POOL = [
   { icon:'\u2665', name:'Boiler Plating',    desc:'Reinforce hull with iron plating', stat:'maxHp',       val:30,   fmt:v=>`+${v} max hull`                       },
   { icon:'\u2665', name:'Riveted Armour',    desc:'Extra layers of forged steel',     stat:'maxHp',       val:50,   fmt:v=>`+${v} max hull`                       },
   { icon:'+',      name:'Emergency Steam',   desc:'Repair critical hull damage',      stat:'heal',        val:0.20, fmt:v=>`+${Math.round(v*100)}% hull restored`  },
-  { icon:'\u25CE', name:'Rapid Valves',      desc:'Faster firing cycle',              stat:'atkSpeed',    val:0.12, fmt:v=>`+${v.toFixed(2)} shots/s`             },
-  { icon:'\u25CE', name:'Pressure Chamber',  desc:'High-pressure shot cycle',         stat:'atkSpeed',    val:0.20, fmt:v=>`+${v.toFixed(2)} shots/s`             },
+  { icon:'\u25CE', name:'Rapid Valves',      desc:'Faster firing cycle',              stat:'atkSpeed',    val:0.25, fmt:v=>`+${v.toFixed(2)} shots/s`             },
+  { icon:'\u25CE', name:'Pressure Chamber',  desc:'High-pressure shot cycle',         stat:'atkSpeed',    val:0.45, fmt:v=>`+${v.toFixed(2)} shots/s`             },
   { icon:'\u25C6', name:'Explosive Powder',  desc:'More potent propellant charge',    stat:'damage',      val:4,    fmt:v=>`+${v} base damage`                    },
   { icon:'\u25C6', name:'Refined Rounds',    desc:'Precision-machined ammunition',    stat:'damage',      val:7,    fmt:v=>`+${v} base damage`                    },
   { icon:'\u25C6', name:'Masterwork Shot',   desc:'Rare artisan-crafted shells',      stat:'damage',      val:12,   fmt:v=>`+${v} base damage`                    },
@@ -205,7 +205,8 @@ function makePlayer() {
     weapon:      null,
     size:        CFG.SHIP_SIZE,
     invulTimer:  0,
-    burstTimer:  0,
+    burstTimer:    0,
+    teslaCooldown: 0,  // countdown in seconds until next tesla fire
   };
 }
 
@@ -386,6 +387,7 @@ function updateParallax(dt) {
 
 function drawParallaxItem(item, x, y) {
   if (y > GH + 200 || y < -200) return;
+  ctx.save();
   if (item.type === 'gear') {
     gearPath(ctx, x, y, item.r, item.angle, item.teeth);
     ctx.stroke();
@@ -402,13 +404,11 @@ function drawParallaxItem(item, x, y) {
     const er = Math.round(item.r);
     ctx.fillRect(Math.round(x - er), Math.round(y - er), er * 2, er * 2);
   } else if (item.type === 'boiler') {
-
     // main tank
     ctx.beginPath();
     ctx.arc(x, y, item.r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-  
     // rivets
     const rivets = 12;
     for (let i=0;i<rivets;i++){
@@ -417,59 +417,44 @@ function drawParallaxItem(item, x, y) {
       const ry = y + Math.sin(a)*(item.r*0.85);
       ctx.fillRect(rx-1, ry-1, 2, 2);
     }
-  
     // ring structure
     if (item.ring){
       ctx.beginPath();
       ctx.ellipse(x, y, item.r*1.4, item.r*0.35, 0, 0, Math.PI*2);
       ctx.stroke();
     }
-  
     // pipe sticking out
     const px = x + Math.cos(item.pipeAngle)*item.r;
     const py = y + Math.sin(item.pipeAngle)*item.r;
     ctx.fillRect(px-3, py-6, 6, 12);
   } else if (item.type === 'scrap') {
-
-    ctx.save();
     ctx.translate(x,y);
     ctx.rotate(item.angle);
-  
     ctx.beginPath();
     ctx.moveTo(-item.r, -item.r*0.4);
     ctx.lineTo(item.r*0.8, -item.r*0.6);
     ctx.lineTo(item.r, item.r*0.3);
     ctx.lineTo(-item.r*0.4, item.r);
     ctx.closePath();
-  
     ctx.fill();
     ctx.stroke();
-  
     // rivet
     ctx.fillRect(-1,-1,2,2);
-  
-    ctx.restore();
   } else if(item.type==='star'){
-
     item.flicker += 0.05;
-  
     const a = 0.4 + Math.sin(item.flicker)*0.3;
-  
     ctx.fillStyle=`rgba(255,180,60,${a})`;
     ctx.fillRect(x,y,item.r,item.r);
   } else if(item.type==='galaxy'){
-
     const g=ctx.createRadialGradient(x,y,0,x,y,item.r);
-  
     g.addColorStop(0,'rgba(255,180,90,0.18)');
     g.addColorStop(1,'rgba(0,0,0,0)');
-  
     ctx.fillStyle=g;
-  
     ctx.beginPath();
     ctx.arc(x,y,item.r,0,Math.PI*2);
     ctx.fill();
   }
+  ctx.restore();
 }
 
 function drawParallax() {
@@ -640,6 +625,14 @@ window.addEventListener('keydown', e => {
     return;
   }
 
+  if (e.code === 'KeyM') {
+    // Return to main menu (weapon selection) from any non-gameover state
+    if (gameState !== 'gameover') {
+      initGame();
+    }
+    return;
+  }
+
   if (e.code === 'KeyU') {
     unlockAllWeapons();
     return;
@@ -775,7 +768,7 @@ function spawnWeaponBullets() {
   const by   = player.y - player.size * 0.7;
 
   if (player.weapon === 'heavy') {
-    fireBullet(bx, by, -Math.PI / 2, mult);
+    fireBullet(bx, by, -Math.PI / 2, mult); 
   } else if (player.weapon === 'spread') {
     const s = 0.28;
     fireBullet(bx, by, -Math.PI / 2 - s, mult);
@@ -784,7 +777,16 @@ function spawnWeaponBullets() {
   } else if (player.weapon === 'aether') {
     fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: 8.8 });
   } else if (player.weapon === 'ricochet') {
-    const wobble = (Math.random() - 0.5) * 0.55;
+    // 150° arc (-75° to +75° from straight up), edge-biased
+    // Use a U-shaped distribution: bias toward the ±75° extremes
+    const halfArc = (75 * Math.PI) / 180; // 75° in radians
+    const u = Math.random();
+    // Bias toward edges: map uniform [0,1] → edge-heavy via power curve
+    // u < 0.5 → negative side, u >= 0.5 → positive side
+    const sign = u < 0.5 ? -1 : 1;
+    const t = sign < 0 ? (0.5 - u) * 2 : (u - 0.5) * 2; // [0,1] per side
+    // Power curve (exponent < 1 pushes mass toward edges)
+    const wobble = sign * Math.pow(t, 0.35) * halfArc;
     fireBullet(bx, by, -Math.PI / 2 + wobble, mult, {
       type: 'ricochet',
       bouncesLeft: 2,
@@ -849,6 +851,11 @@ function update(dt) {
 
   // Auto-shoot
   shootTimer -= dt;
+  if (player.weapon === 'tesla') {
+    player.teslaCooldown = shootTimer;
+  } else {
+    player.teslaCooldown = 0;
+  }
   if (shootTimer <= 0) {
     spawnWeaponBullets();
     shootTimer = 1 / player.atkSpeed;
@@ -1335,7 +1342,30 @@ function drawPlayerHPBar() {
   ctx.strokeRect(bx, by, Math.round(bw), 4);
 }
 
-// Fingertip cursor — brass crosshair dot
+// Tesla Lance cooldown bar — shown below HP bar when weapon is tesla
+function drawTeslaCooldownBar() {
+  if (player.weapon !== 'tesla') return;
+  const maxCd = 1 / player.atkSpeed;
+  const cd    = Math.max(0, player.teslaCooldown || 0);
+  const pct   = cd / maxCd;   // 1 = just fired (full cooldown), 0 = ready
+
+  const bw = player.size * 2 + 8;
+  const bx = Math.round(player.x - bw / 2);
+  const by = Math.round(player.y + player.size + 4 + 7);  // 7px below HP bar
+
+  // Background track
+  ctx.fillStyle = '#0a1018';
+  ctx.fillRect(bx, by, Math.round(bw), 3);
+
+  // Fill — light blue, shrinks toward 0 as cooldown elapses
+  ctx.fillStyle = pct < 0.15 ? '#a0ffff' : '#50c8e8';
+  ctx.fillRect(bx, by, Math.round(bw * (1 - pct)), 3);
+
+  // Border
+  ctx.strokeStyle = '#1a3040';
+  ctx.lineWidth   = 0.5;
+  ctx.strokeRect(bx, by, Math.round(bw), 3);
+}
 function drawFingertipCursor() {
   if (fingerRawX === null) return;
 
@@ -1496,6 +1526,7 @@ function draw() {
   // Player
   drawAirship(player.x, player.y, player.size, player.invulTimer > 0);
   drawPlayerHPBar();
+  drawTeslaCooldownBar();
 
   // Fingertip cursor (drawn on top of everything)
   drawFingertipCursor();
@@ -2051,6 +2082,7 @@ function stepHandLerp(dt) {
 // ================================================================
 const wsStatusEl = document.getElementById('ws-status');
 const noHandEl   = document.getElementById('no-hand-hint');
+const kbShortcutsEl = document.getElementById('kb-shortcuts');
 let ws;
 
 function connectWS() {
@@ -2097,4 +2129,5 @@ function loop(now) {
 initHandViewer();
 connectWS();
 initGame();
+kbShortcutsEl.style.display = 'flex';   // always visible
 requestAnimationFrame(loop);
