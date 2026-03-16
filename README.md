@@ -80,7 +80,7 @@
 * Hide option for pilot stats and hand tracker
 * Add a confirmation screen when pressing "M" and a warning "You will be redirected to the weapon selection. THIS WILL RESET YOUR CURRENT RUN, ARE YOU SURE? (Yes) (No)"
 * Change the crit damage text to RED
-* Player periodically gets teleported to top left, maybe hand tracking ?
+* Player periodically gets teleported to top left, maybe hand tracking or camera issue?
 
 # Game Design
 
