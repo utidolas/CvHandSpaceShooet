@@ -113,6 +113,7 @@
      padding-bottom: 10px;
      border-bottom: 1px solid var(--iron-light);
      margin-bottom: 10px;
+     position: relative;
    }
    
    .stat-row { display: flex; align-items: center; gap: 7px; padding: 3px 0; }
@@ -372,6 +373,73 @@
      background: var(--copper); border-radius: 2px;
      transition: width 0.04s linear;
    }
+   
+   /* ================================================================
+      MAIN MENU CONFIRM OVERLAY
+      ================================================================ */
+   #mainmenu-overlay {
+     display: none;
+     position: absolute; top: 0; left: 0;
+     width: 100%; height: 100%;
+     z-index: 60;
+     background: rgba(9, 7, 10, 0.88);
+     align-items: center; justify-content: center;
+   }
+   #mainmenu-overlay.visible { display: flex; }
+   
+   #mainmenu-modal {
+     display: flex; flex-direction: column; align-items: center;
+     gap: 16px;
+     background: var(--panel-bg);
+     border: 1px solid var(--iron-light);
+     border-top: 2px solid var(--rust);
+     padding: 42px 56px;
+     min-width: 460px;
+   }
+   .mainmenu-warning {
+     font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-align: center;
+   }
+   #mainmenu-btns {
+     display: flex; gap: 18px; margin-top: 10px;
+   }
+   .confirm-action-btn {
+     font-family: var(--font-mono); font-size: 12px; letter-spacing: 2px;
+     padding: 12px 28px; background: transparent;
+     border: 1px solid var(--copper); color: var(--copper); cursor: pointer;
+     transition: background 0.2s, color 0.2s, border-color 0.2s;
+   }
+   .confirm-action-btn:hover {
+     background: rgba(200,134,10,0.14); color: var(--brass); border-color: var(--brass);
+   }
+   .confirm-action-btn.danger-btn {
+     border-color: var(--rust); color: var(--rust);
+   }
+   .confirm-action-btn.danger-btn:hover {
+     background: rgba(192,64,32,0.14); color: #e05838; border-color: #e05838;
+   }
+   
+   /* ================================================================
+      PANEL HIDE/SHOW TOGGLE BUTTONS
+      ================================================================ */
+   .panel-toggle-btn {
+     position: absolute; top: 4px; right: 6px;
+     background: none; border: none;
+     color: var(--text-dim); font-size: 11px; letter-spacing: 1px;
+     cursor: pointer; padding: 2px 4px;
+     pointer-events: all;
+     transition: color 0.2s;
+     font-family: var(--font-mono);
+     line-height: 1;
+   }
+   .panel-toggle-btn:hover { color: var(--brass); }
+   
+   #stats-panel.panel-collapsed > *:not(.panel-heading) { display: none !important; }
+   #hand-viewer.panel-collapsed #hand-canvas-wrap { display: none; }
+   
+   /* ================================================================
+      CRIT DAMAGE — red text
+      ================================================================ */
+   #val-cdmg { color: var(--rust) !important; }
    
    /* ================================================================
       MENU CURSOR (index finger pointer in overlays)

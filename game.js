@@ -626,9 +626,9 @@ window.addEventListener('keydown', e => {
   }
 
   if (e.code === 'KeyM') {
-    // Return to main menu (weapon selection) from any non-gameover state
-    if (gameState !== 'gameover') {
-      initGame();
+    // Return to main menu — confirm first to avoid accidental resets
+    if (gameState !== 'gameover' && gameState !== 'weapon-select') {
+      showMainMenuConfirm();
     }
     return;
   }
@@ -642,6 +642,43 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys.delete(e.key));
 document.getElementById('restart-btn').addEventListener('click', initGame);
+
+// ================================================================
+// MAIN MENU CONFIRM
+// ================================================================
+function showMainMenuConfirm() {
+  const prev = gameState;
+  if (prev === 'playing') togglePause();   // pause the game while dialog is open
+  const overlay = document.getElementById('mainmenu-overlay');
+  overlay.classList.add('visible');
+
+  document.getElementById('mainmenu-yes-btn').onclick = () => {
+    overlay.classList.remove('visible');
+    initGame();
+  };
+  document.getElementById('mainmenu-no-btn').onclick = () => {
+    overlay.classList.remove('visible');
+    if (prev === 'playing') togglePause();  // resume
+  };
+}
+
+// ================================================================
+// PANEL TOGGLE BUTTONS
+// ================================================================
+(function initPanelToggles() {
+  function makeToggle(panelId, btnId) {
+    const panel = document.getElementById(panelId);
+    const btn   = document.getElementById(btnId);
+    if (!panel || !btn) return;
+    btn.addEventListener('click', () => {
+      const collapsed = panel.classList.toggle('panel-collapsed');
+      btn.textContent = collapsed ? '+' : '−';
+      btn.title       = collapsed ? 'Show panel' : 'Hide panel';
+    });
+  }
+  makeToggle('stats-panel',  'stats-toggle-btn');
+  makeToggle('hand-viewer',  'hand-toggle-btn');
+})();
 
 // ================================================================
 // SPAWN HELPERS
@@ -1654,13 +1691,20 @@ function remapHand(rawVal, lo, hi) {
 }
 
 function setHandTargets(landmarks) {
+  // Guard: landmarks must be a full 21-point array with finite coordinates.
+  // A malformed/partial frame (e.g. MediaPipe returning NaN or undefined for
+  // a partially-detected hand) would otherwise push NaN into player.tx/ty,
+  // which collapses to 0 after Math.max/min and teleports the ship top-left.
+  if (!Array.isArray(landmarks) || landmarks.length < 21) return;
+  const tip = landmarks[8];
+  if (!tip || !isFinite(tip.x) || !isFinite(tip.y)) return;
+
   landmarks.forEach((lm, i) => handTargetPos[i].copy(lmToVec3(lm)));
   hasHand = true;
   handJoints.forEach(m => m.visible = true);
   handBones.forEach(m  => m.visible = true);
 
   // Use INDEX_FINGER_TIP (landmark 8) for ship/cursor control
-  const tip = landmarks[8];
   fingerRawX = remapHand(tip.x, CFG.HAND_X0, CFG.HAND_X1);
   fingerRawY = remapHand(tip.y, CFG.HAND_Y0, CFG.HAND_Y1);
 
