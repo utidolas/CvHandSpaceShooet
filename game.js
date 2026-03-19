@@ -17,13 +17,13 @@ const CFG = {
   ENEMY_BASE_HP:          300,
   ENEMY_HP_SCALE:         1.28,
   ENEMY_BASE_DMG:         250,
-  ENEMY_DMG_SCALE:        1.18,
+  ENEMY_DMG_SCALE:        1.19,
   ENEMY_SHOOT_BASE:       2.5,
   ENEMY_SHOOT_MIN:        0.065, // minimum attack speed
-  ENEMY_SHOOT_DEC:        0.1, // enemy will gain 10% attack speed per wave
+  ENEMY_SHOOT_DEC:        0.15, // enemy will gain 15% attack speed per wave
 
   // Wave
-  WAVE_TIMER:             14,
+  WAVE_TIMER:             16,
   WAVE_PENALTY:           0.05,
 
   // Formation
@@ -580,29 +580,153 @@ function applyWeapon(wep) {
 }
 
 // ================================================================
-// WAVE SPAWNING
+// WAVE SPAWNING — random formation each wave
 // ================================================================
+
+// Each formation fn receives (count, wave) and pushes into enemies[].
+const FORMATIONS = [
+
+  // 0 · Classic grid — the baseline
+  function formGrid(count) {
+    const cols    = Math.min(count, 7);
+    const margin  = 90;
+    const spacing = Math.min((GW - margin * 2) / Math.max(cols - 1, 1), 105);
+    const startX  = (GW - spacing * (cols - 1)) / 2;
+    const startY  = GH * CFG.ENEMY_ZONE_TOP + 55;
+    const rowGap  = 65;
+    for (let i = 0; i < count; i++) {
+      enemies.push(makeEnemy(
+        startX + (i % cols) * spacing,
+        startY + Math.floor(i / cols) * rowGap,
+        wave
+      ));
+    }
+  },
+
+  // 1 · V-wedge pointing down
+  function formWedge(count) {
+    const cx = GW / 2;
+    const yBase = GH * CFG.ENEMY_ZONE_TOP + 40;
+    const xStep = 80, yStep = 52;
+    const half = Math.floor(count / 2);
+    for (let i = 0; i < count; i++) {
+      const side   = i <= half ? i : count - 1 - i;
+      const mirror = i <= half ? -1 : 1;
+      enemies.push(makeEnemy(cx + mirror * side * xStep, yBase + side * yStep, wave));
+    }
+  },
+
+  // 2 · Diamond / rhombus
+  function formDiamond(count) {
+    const cx   = GW / 2;
+    const cyTop = GH * CFG.ENEMY_ZONE_TOP + 30;
+    const xStep = 82, yStep = 52;
+    const n     = Math.ceil(Math.sqrt(count));
+    let placed  = 0;
+    for (let row = 0; row < n && placed < count; row++) {
+      const cols = row < n / 2 ? row * 2 + 1 : (n - row) * 2 + 1;
+      const w    = (cols - 1) * xStep;
+      for (let col = 0; col < cols && placed < count; col++) {
+        enemies.push(makeEnemy(cx - w / 2 + col * xStep, cyTop + row * yStep, wave));
+        placed++;
+      }
+    }
+  },
+
+  // 3 · Two flanking columns
+  function formColumns(count) {
+    const yBase  = GH * CFG.ENEMY_ZONE_TOP + 30;
+    const yStep  = 62;
+    const half   = Math.ceil(count / 2);
+    const leftX  = GW * 0.22;
+    const rightX = GW * 0.78;
+    for (let i = 0; i < count; i++) {
+      const x = i < half ? leftX : rightX;
+      const y = yBase + (i % half) * yStep;
+      enemies.push(makeEnemy(x, y, wave));
+    }
+  },
+
+  // 4 · Arc / crescent across the top
+  function formArc(count) {
+    const cx    = GW / 2;
+    const cy    = GH * CFG.ENEMY_ZONE_TOP - 20;
+    const rx    = GW * 0.38;
+    const ry    = GH * 0.18;
+    const aMin  = Math.PI * 0.08;
+    const aMax  = Math.PI * 0.92;
+    for (let i = 0; i < count; i++) {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      const a = aMin + t * (aMax - aMin);
+      enemies.push(makeEnemy(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, wave));
+    }
+  },
+
+  // 5 · X cross
+  function formCross(count) {
+    const cx    = GW / 2;
+    const yBase = GH * CFG.ENEMY_ZONE_TOP + 20;
+    const step  = 68;
+    const arm   = Math.floor((count - 1) / 4);
+    // Centre
+    enemies.push(makeEnemy(cx, yBase + arm * step, wave));
+    let placed = 1;
+    for (let i = 1; i <= arm && placed < count; i++) {
+      enemies.push(makeEnemy(cx,           yBase + (arm - i) * step, wave)); placed++;
+      if (placed < count) { enemies.push(makeEnemy(cx,           yBase + (arm + i) * step, wave)); placed++; }
+      if (placed < count) { enemies.push(makeEnemy(cx - i * step, yBase + arm * step,       wave)); placed++; }
+      if (placed < count) { enemies.push(makeEnemy(cx + i * step, yBase + arm * step,       wave)); placed++; }
+    }
+  },
+
+  // 6 · Scattered random clusters
+  function formScatter(count) {
+    const zoneH = (CFG.ENEMY_ZONE_BTM - CFG.ENEMY_ZONE_TOP) * GH * 0.7;
+    const margin = 80;
+    for (let i = 0; i < count; i++) {
+      const x = margin + Math.random() * (GW - margin * 2);
+      const y = GH * CFG.ENEMY_ZONE_TOP + 30 + Math.random() * zoneH;
+      enemies.push(makeEnemy(x, y, wave));
+    }
+  },
+
+  // 7 · Three tight squads
+  function formSquads(count) {
+    const yBase = GH * CFG.ENEMY_ZONE_TOP + 40;
+    const centers = [GW * 0.22, GW * 0.5, GW * 0.78];
+    const step  = 52;
+    for (let i = 0; i < count; i++) {
+      const squad = i % 3;
+      const rank  = Math.floor(i / 3);
+      const col   = rank % 2;
+      const row   = Math.floor(rank / 2);
+      enemies.push(makeEnemy(
+        centers[squad] + (col - 0.5) * step,
+        yBase + row * step,
+        wave
+      ));
+    }
+  },
+];
+
+// Track last formation index to avoid immediate repeats
+let _lastFormationIdx = -1;
+
 function spawnWave() {
   wave++;
   waveTimer = CFG.WAVE_TIMER;
   groupX    = 0;
   groupDir  = 1;
 
-  const count   = Math.min(4 + wave * 2, 24);
-  const cols    = Math.min(count, 7);
-  const margin  = 90;
-  const spacing = Math.min((GW - margin * 2) / Math.max(cols - 1, 1), 105);
-  const startX  = (GW - spacing * (cols - 1)) / 2;
-  const startY  = GH * CFG.ENEMY_ZONE_TOP + 55;
-  const rowGap  = 65;
+  const count = Math.min(4 + wave * 2, 24);
 
-  for (let i = 0; i < count; i++) {
-    enemies.push(makeEnemy(
-      startX + (i % cols) * spacing,
-      startY + Math.floor(i / cols) * rowGap,
-      wave
-    ));
-  }
+  // Pick a random formation, avoiding immediate repeat
+  let idx;
+  do { idx = Math.floor(Math.random() * FORMATIONS.length); }
+  while (idx === _lastFormationIdx && FORMATIONS.length > 1);
+  _lastFormationIdx = idx;
+
+  FORMATIONS[idx](count);
   announceWave(wave);
 }
 
@@ -853,7 +977,7 @@ function spawnParticles(x, y, color, count = 8) {
 }
 
 function spawnDmgNumber(x, y, dmg, crit) {
-  particles.push({ isDmgText: true, x, y, vy: -60, text: crit ? `\u2605${dmg}` : `${dmg}`, color: crit ? '#ffcc00' : '#e8a020', size: crit ? 17 : 13, life: 1.2, decay: 0.75 });
+  particles.push({ isDmgText: true, x, y, vy: -60, text: crit ? `\u2605${dmg}` : `${dmg}`, color: crit ? '#ff3020' : '#e8a020', size: crit ? 17 : 13, life: 1.2, decay: 0.75 });
 }
 
 function spawnOrb(x, y) {
