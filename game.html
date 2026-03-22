@@ -31,6 +31,12 @@
         <span class="top-label">SCORE</span>
         <span id="score-num">00000</span>
       </div>
+      <div id="xp-display">
+        <span class="top-label">LV</span>
+        <span id="level-num">1</span>
+        <div id="xp-track"><div id="xp-fill"></div></div>
+        <span id="xp-sp" class="top-label" style="color:#50d4a0;letter-spacing:2px">0 SP</span>
+      </div>
     </div>
 
     <div id="stats-panel">
@@ -117,6 +123,7 @@
       </div>
       <div class="gesture-hold-wrap"><div id="wg-bar" class="gesture-hold-bar"></div></div>
       <div class="overlay-hint">HOLD GESTURE OR POINT &amp; FIST TO SELECT</div>
+      <button id="weapon-skilltree-btn" class="confirm-action-btn st-entry-btn">&#9651; &nbsp; SKILL TREE &nbsp; &#9651;</button>
     </div>
   </div>
 
@@ -188,6 +195,33 @@
       <div id="go-score">SCORE: 00000</div>
       <div id="go-wave">REACHED WAVE 1</div>
       <button id="restart-btn">[ ENGAGE AGAIN ]</button>
+    </div>
+  </div>
+
+  <!-- Level-up banner -->
+  <div id="level-up-banner">
+    <span id="lvlup-text">LEVEL UP!</span>
+  </div>
+
+  <!-- Skill Tree overlay -->
+  <div id="skilltree-overlay">
+    <div id="skilltree-modal">
+      <div id="st-header">
+        <div id="st-title">&#9881; &nbsp; SKILL TREE &nbsp; &#9881;</div>
+        <div id="st-meta">
+          <span id="st-lvl">LEVEL 1</span>
+          <span id="st-sp">0 SP AVAILABLE</span>
+        </div>
+      </div>
+      <div id="st-columns">
+        <div class="st-col" id="st-col-defense"></div>
+        <div class="st-col-sep"></div>
+        <div class="st-col" id="st-col-attack"></div>
+        <div class="st-col-sep"></div>
+        <div class="st-col" id="st-col-utility"></div>
+      </div>
+      <div id="st-legend">CLICK AN AVAILABLE NODE TO SPEND A SKILL POINT &mdash; BONUSES APPLY EVERY RUN</div>
+      <button id="st-close-btn" class="confirm-action-btn">[ BACK TO WEAPON SELECT ]</button>
     </div>
   </div>
 

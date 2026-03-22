@@ -71,6 +71,248 @@ const CFG = {
 };
 
 // ================================================================
+// XP / LEVEL / PERSISTENT SKILL TREE
+// ================================================================
+const XP_PER_LEVEL = 200;  // flat XP per level
+
+// Three paths, four nodes each.
+// stat keys: maxHp (%), damage (%), atkSpeed (%), critChance (abs),
+//            critMult (abs), moveSpeed (%), bulletSpeed (%), dmgReduce (abs),
+//            orbHeal (abs), orbDrop (abs)
+const SKILL_TREE = [
+  {
+    id: 'defense', label: 'DEFENSE', color: '#5a90e0', icon: '\u26CA',
+    nodes: [
+      { id:'def_1', name:'Hull Plating',    icon:'\u2B21', desc:'Reinforce outer hull layers',          stat:'maxHp',     val:0.15, cost:1, req:null    },
+      { id:'def_2', name:'Bulkhead',         icon:'\u29EB', desc:'Reduce all incoming damage by 10%',    stat:'dmgReduce', val:0.10, cost:2, req:'def_1' },
+      { id:'def_3', name:'Boiler Fortress',  icon:'\u2699', desc:'Massive secondary hull expansion',     stat:'maxHp',     val:0.30, cost:2, req:'def_2' },
+      { id:'def_4', name:'Titan Chassis',    icon:'\u2736', desc:'Near-impenetrable plating layers',     stat:'dmgReduce', val:0.15, cost:3, req:'def_3' },
+    ]
+  },
+  {
+    id: 'attack', label: 'ATTACK', color: '#e05a5a', icon: '\u2694',
+    nodes: [
+      { id:'atk_1', name:'Refined Powder',  icon:'\u25C6', desc:'Higher-grade propellant charge',       stat:'damage',    val:0.10, cost:1, req:null    },
+      { id:'atk_2', name:'Hair Trigger',     icon:'\u25CE', desc:'Faster firing mechanism cycle',        stat:'atkSpeed',  val:0.10, cost:2, req:'atk_1' },
+      { id:'atk_3', name:'Precision Sight',  icon:'\u2726', desc:'Improved critical hit chance +8%',     stat:'critChance',val:0.08, cost:2, req:'atk_2' },
+      { id:'atk_4', name:'Volatile Core',    icon:'\u2605', desc:'Devastating critical strike damage',   stat:'critMult',  val:0.30, cost:3, req:'atk_3' },
+    ]
+  },
+  {
+    id: 'utility', label: 'UTILITY', color: '#50d4a0', icon: '\u2699',
+    nodes: [
+      { id:'utl_1', name:'Steam Turbine',   icon:'\u26A1', desc:'Boost thruster output for +10% speed', stat:'moveSpeed', val:0.10, cost:1, req:null    },
+      { id:'utl_2', name:'Medic Orbs',       icon:'\u2665', desc:'Orbs heal +2% more HP on pickup',      stat:'orbHeal',   val:0.02, cost:2, req:'utl_1' },
+      { id:'utl_3', name:'Aether Propellant',icon:'\u27A4', desc:'Faster projectile velocity +12%',      stat:'bulletSpeed',val:0.12,cost:2, req:'utl_2' },
+      { id:'utl_4', name:'Fortune Gears',    icon:'\u29BE', desc:'Higher chance for health orb drops',   stat:'orbDrop',   val:0.10, cost:3, req:'utl_3' },
+    ]
+  },
+];
+
+// ---- Persistent state (survives runs) ----
+const PERSIST_KEY = 'aethericSkiesPersist_v1';
+
+let PERSIST = {
+  totalXP:  0,
+  level:    1,
+  skills:   {},   // id → true if purchased
+};
+
+function loadPersist() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      PERSIST.totalXP = parsed.totalXP || 0;
+      PERSIST.skills  = parsed.skills  || {};
+      PERSIST.level   = calcLevel(PERSIST.totalXP);
+    }
+  } catch(e) { /* ignore */ }
+}
+
+function savePersist() {
+  try {
+    localStorage.setItem(PERSIST_KEY, JSON.stringify({
+      totalXP: PERSIST.totalXP,
+      skills:  PERSIST.skills,
+    }));
+  } catch(e) { /* ignore */ }
+}
+
+function calcLevel(xp) { return Math.floor(xp / XP_PER_LEVEL) + 1; }
+function xpIntoCurrentLevel(xp) { return xp % XP_PER_LEVEL; }
+
+function getSpentSP() {
+  let spent = 0;
+  for (const path of SKILL_TREE) {
+    for (const node of path.nodes) {
+      if (PERSIST.skills[node.id]) spent += node.cost;
+    }
+  }
+  return spent;
+}
+function getAvailableSP() { return Math.max(0, (PERSIST.level - 1) - getSpentSP()); }
+
+function addXP(amount) {
+  const prevLevel = PERSIST.level;
+  PERSIST.totalXP += amount;
+  PERSIST.level = calcLevel(PERSIST.totalXP);
+  if (PERSIST.level > prevLevel) {
+    const gained = PERSIST.level - prevLevel;
+    showLevelUpBanner(PERSIST.level, gained);
+  }
+  savePersist();
+  updateXPBar();
+}
+
+function updateXPBar() {
+  const lvlEl  = document.getElementById('level-num');
+  const fillEl = document.getElementById('xp-fill');
+  const spEl   = document.getElementById('xp-sp');
+  if (lvlEl)  lvlEl.textContent  = PERSIST.level;
+  if (fillEl) fillEl.style.width = ((xpIntoCurrentLevel(PERSIST.totalXP) / XP_PER_LEVEL) * 100).toFixed(1) + '%';
+  if (spEl)   spEl.textContent   = getAvailableSP() + ' SP';
+}
+
+let _lvlBannerTimer = null;
+function showLevelUpBanner(lvl, gained) {
+  const el  = document.getElementById('level-up-banner');
+  const txt = document.getElementById('lvlup-text');
+  if (!el || !txt) return;
+  txt.textContent = `LEVEL ${lvl}  +${gained} SKILL POINT${gained > 1 ? 'S' : ''}`;
+  el.classList.add('show');
+  if (_lvlBannerTimer) clearTimeout(_lvlBannerTimer);
+  _lvlBannerTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function applySkillBonuses() {
+  const s = PERSIST.skills;
+  let hpMult = 1.0, dmgReduce = 0;
+  if (s.def_1) hpMult    += 0.15;
+  if (s.def_2) dmgReduce += 0.10;
+  if (s.def_3) hpMult    += 0.30;
+  if (s.def_4) dmgReduce += 0.15;
+
+  let dmgMult = 1.0, atkMult = 1.0, critBonus = 0, critMultBonus = 0;
+  if (s.atk_1) dmgMult      += 0.10;
+  if (s.atk_2) atkMult      += 0.10;
+  if (s.atk_3) critBonus    += 0.08;
+  if (s.atk_4) critMultBonus += 0.30;
+
+  let speedMult = 1.0, orbHealBonus = 0, bspeedMult = 1.0, orbDropBonus = 0;
+  if (s.utl_1) speedMult    += 0.10;
+  if (s.utl_2) orbHealBonus += 0.02;
+  if (s.utl_3) bspeedMult   += 0.12;
+  if (s.utl_4) orbDropBonus += 0.10;
+
+  const baseHp = Math.round(CFG.BASE_HP * hpMult);
+  player.hp          = baseHp;
+  player.maxHp       = baseHp;
+  player.damage      = Math.round(CFG.BASE_DAMAGE * dmgMult);
+  player.atkSpeed    = CFG.BASE_ATK_SPEED * atkMult;
+  player.critChance  = Math.min(0.95, CFG.BASE_CRIT_CHANCE + critBonus);
+  player.critMult    = CFG.BASE_CRIT_MULT + critMultBonus;
+  player.moveSpeed   = 1.0 * speedMult;
+  player.bulletSpeed = CFG.BASE_BULLET_SPEED * bspeedMult;
+  player.dmgReduce   = dmgReduce;
+  player.orbHealBonus = orbHealBonus;
+  player.orbDropBonus = orbDropBonus;
+}
+
+// ---- Skill tree UI ----
+function isNodeUnlocked(node) {
+  if (!node.req) return true;
+  return !!PERSIST.skills[node.req];
+}
+
+function renderSkillTree() {
+  const sp = getAvailableSP();
+  document.getElementById('st-sp').textContent  = `${sp} SP AVAILABLE`;
+  document.getElementById('st-lvl').textContent = `LEVEL ${PERSIST.level}`;
+
+  for (const path of SKILL_TREE) {
+    const col = document.getElementById(`st-col-${path.id}`);
+    if (!col) continue;
+    col.innerHTML = `<div class="st-path-title" style="color:${path.color}">${path.icon} ${path.label}</div>`;
+
+    for (let ni = 0; ni < path.nodes.length; ni++) {
+      const node = path.nodes[ni];
+      const purchased  = !!PERSIST.skills[node.id];
+      const unlocked   = isNodeUnlocked(node);
+      const affordable = sp >= node.cost;
+      const canBuy = unlocked && !purchased && affordable;
+      const locked = !unlocked || (!purchased && !affordable);
+
+      const fmtVal = formatSkillVal(node);
+
+      const card = document.createElement('div');
+      card.className = 'st-node' +
+        (purchased ? ' st-purchased' : '') +
+        (canBuy    ? ' st-available' : '') +
+        (locked && !purchased ? ' st-locked' : '');
+      card.style.borderColor = purchased ? path.color : (canBuy ? path.color : '');
+      card.innerHTML =
+        `<div class="st-node-top">` +
+          `<span class="st-icon" style="color:${purchased?path.color:'inherit'}">${node.icon}</span>` +
+          `<span class="st-name">${node.name}</span>` +
+          `<span class="st-cost">${purchased ? '\u2713' : node.cost + ' SP'}</span>` +
+        `</div>` +
+        `<div class="st-desc">${node.desc}</div>` +
+        `<div class="st-val" style="color:${path.color}">${fmtVal}</div>`;
+
+      if (canBuy) {
+        card.addEventListener('click', () => purchaseSkill(node));
+      }
+
+      col.appendChild(card);
+
+      // Connector arrow between nodes
+      if (ni < path.nodes.length - 1) {
+        const arrow = document.createElement('div');
+        arrow.className = 'st-arrow';
+        arrow.style.color = path.color;
+        arrow.innerHTML = '\u2193';
+        col.appendChild(arrow);
+      }
+    }
+  }
+}
+
+function formatSkillVal(node) {
+  switch (node.stat) {
+    case 'maxHp':      return `+${Math.round(node.val * 100)}% MAX HP`;
+    case 'dmgReduce':  return `\u2212${Math.round(node.val * 100)}% DAMAGE TAKEN`;
+    case 'damage':     return `+${Math.round(node.val * 100)}% DAMAGE`;
+    case 'atkSpeed':   return `+${Math.round(node.val * 100)}% FIRE RATE`;
+    case 'critChance': return `+${Math.round(node.val * 100)}% CRIT CHANCE`;
+    case 'critMult':   return `+${Math.round(node.val * 100)}% CRIT DMG`;
+    case 'moveSpeed':  return `+${Math.round(node.val * 100)}% MOVE SPEED`;
+    case 'orbHeal':    return `+${Math.round(node.val * 100)}% ORB HEAL`;
+    case 'bulletSpeed':return `+${Math.round(node.val * 100)}% SHOT SPEED`;
+    case 'orbDrop':    return `+${Math.round(node.val * 100)}% ORB DROP RATE`;
+    default:           return '';
+  }
+}
+
+function purchaseSkill(node) {
+  if (!isNodeUnlocked(node)) return;
+  if (PERSIST.skills[node.id]) return;
+  if (getAvailableSP() < node.cost) return;
+  PERSIST.skills[node.id] = true;
+  savePersist();
+  renderSkillTree();
+}
+
+function showSkillTree() {
+  renderSkillTree();
+  document.getElementById('skilltree-overlay').classList.add('visible');
+}
+
+function hideSkillTree() {
+  document.getElementById('skilltree-overlay').classList.remove('visible');
+}
+
+// ================================================================
 // WEAPON DEFINITIONS
 // ================================================================
 const WEAPONS = [
@@ -204,6 +446,9 @@ function makePlayer() {
     bulletSpeed: CFG.BASE_BULLET_SPEED,
     weapon:      null,
     size:        CFG.SHIP_SIZE,
+    dmgReduce:   0,      // % damage reduction (from Defense skill tree)
+    orbHealBonus: 0,     // extra % heal per orb (from Utility skill tree)
+    orbDropBonus: 0,     // extra orb drop chance (from Utility skill tree)
     invulTimer:  0,
     burstTimer:    0,
     teslaCooldown: 0,  // countdown in seconds until next tesla fire
@@ -479,6 +724,7 @@ function drawParallax() {
 // ================================================================
 function initGame() {
   player      = makePlayer();
+  applySkillBonuses();   // apply persistent skill tree bonuses
   bullets     = [];
   eBullets    = [];
   enemies     = [];
@@ -538,6 +784,10 @@ function showWeaponSelect() {
     }
     container.appendChild(card);
   }
+  // Skill tree button inside weapon overlay
+  const stBtn = document.getElementById('weapon-skilltree-btn');
+  if (stBtn) stBtn.onclick = showSkillTree;
+
   showOverlay('weapon-overlay');
 }
 
@@ -912,9 +1162,10 @@ function fireTeslaBeam(dmgMult) {
     if (e.hp <= 0) {
       spawnParticles(ex, e.y, '#60e8ff', 10);
       spawnParticles(ex, e.y, '#c8f8ff', 6);
-      if (Math.random() < CFG.ORB_DROP_CHANCE) spawnOrb(ex, e.y);
+      if (Math.random() < CFG.ORB_DROP_CHANCE + (player.orbDropBonus || 0)) spawnOrb(ex, e.y);
       enemies.splice(ei, 1);
       score += 10 * wave;
+      addXP(5 + wave);
       updateTopBar();
     }
   }
@@ -981,7 +1232,9 @@ function spawnDmgNumber(x, y, dmg, crit) {
 }
 
 function spawnOrb(x, y) {
-  orbs.push({ x, y, vy: CFG.ORB_FALL_SPEED, r: 10, healAmt: Math.round(CFG.ORB_HEAL_MIN + Math.random() * (CFG.ORB_HEAL_MAX - CFG.ORB_HEAL_MIN)), bob: Math.random() * Math.PI * 2 });
+  // Heal = 4% base + any bonus from Utility skill tree
+  const healPct = 0.04 + (player.orbHealBonus || 0);
+  orbs.push({ x, y, vy: CFG.ORB_FALL_SPEED, r: 10, healPct, bob: Math.random() * Math.PI * 2 });
 }
 
 // ================================================================
@@ -1106,6 +1359,7 @@ function update(dt) {
 
   // Wave cleared
   if (enemies.length === 0) {
+    addXP(wave * 10);   // wave-clear bonus
     gameState = 'upgrading';
     setTimeout(showUpgradeCards, 400);
   }
@@ -1164,9 +1418,10 @@ function checkBulletEnemyHits() {
       if (e.hp <= 0) {
         spawnParticles(ex, e.y, '#c8860a', 12);
         spawnParticles(ex, e.y, '#e04010',  5);
-        if (Math.random() < CFG.ORB_DROP_CHANCE) spawnOrb(ex, e.y);
+        if (Math.random() < CFG.ORB_DROP_CHANCE + (player.orbDropBonus || 0)) spawnOrb(ex, e.y);
         enemies.splice(ei, 1);
         score += 10 * wave;
+        addXP(5 + wave);
         updateTopBar();
       }
 
@@ -1212,21 +1467,23 @@ function updateOrbs(dt) {
     if (o.y > GH + 20) { orbs.splice(i, 1); continue; }
     const dx = player.x - o.x, dy = player.y - o.y;
     if (dx * dx + dy * dy < (player.size + o.r) ** 2) {
-      player.hp = Math.min(player.maxHp, player.hp + o.healAmt);
+      const healAmt = Math.round(player.maxHp * o.healPct);
+      player.hp = Math.min(player.maxHp, player.hp + healAmt);
       updateStatsPanel();
-      particles.push({ isDmgText: true, x: o.x, y: o.y, vy: -55, text: `+${o.healAmt}`, color: '#60ff80', size: 15, life: 1.4, decay: 0.55 });
+      particles.push({ isDmgText: true, x: o.x, y: o.y, vy: -55, text: `+${healAmt}`, color: '#60ff80', size: 15, life: 1.4, decay: 0.55 });
       orbs.splice(i, 1);
     }
   }
 }
 
 function damagePlayer(amount, isTimerPenalty) {
-  player.hp = Math.max(0, player.hp - amount);
+  const reduced = Math.round(amount * (1 - (player.dmgReduce || 0)));
+  player.hp = Math.max(0, player.hp - reduced);
   player.invulTimer = 1.0;   // 1 second invulnerability
   screenFlash = 1.0;
   spawnParticles(player.x, player.y, '#ff3030', 7);
   if (isTimerPenalty) {
-    particles.push({ isDmgText: true, x: GW / 2, y: GH * 0.12, vy: -30, text: `HULL BREACH \u2212${amount}`, color: '#e05050', size: 14, life: 2.0, decay: 0.38 });
+    particles.push({ isDmgText: true, x: GW / 2, y: GH * 0.12, vy: -30, text: `HULL BREACH \u2212${reduced}`, color: '#e05050', size: 14, life: 2.0, decay: 0.38 });
   }
   updateStatsPanel();
   if (player.hp <= 0) {
@@ -1328,15 +1585,35 @@ function drawBackground() {
   // Three parallax layers (already updated in update())
   drawParallax();
 
-  // Thin dashed zone separator
+  // Zone separator — visible tactical line
   ctx.save();
-  ctx.strokeStyle = 'rgba(200,134,10,0.07)';
-  ctx.lineWidth   = 1;
-  ctx.setLineDash([6, 14]);
+  // Soft glow layer
+  ctx.strokeStyle = 'rgba(200,134,10,0.12)';
+  ctx.lineWidth   = 6;
+  ctx.setLineDash([]);
   ctx.beginPath();
   ctx.moveTo(0, GH * CFG.ENEMY_ZONE_BTM);
   ctx.lineTo(GW, GH * CFG.ENEMY_ZONE_BTM);
   ctx.stroke();
+  // Main dashed line
+  ctx.strokeStyle = 'rgba(232,160,32,0.55)';
+  ctx.lineWidth   = 1.5;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.moveTo(0, GH * CFG.ENEMY_ZONE_BTM);
+  ctx.lineTo(GW, GH * CFG.ENEMY_ZONE_BTM);
+  ctx.stroke();
+  // Small tick marks
+  ctx.strokeStyle = 'rgba(232,160,32,0.80)';
+  ctx.lineWidth   = 1.5;
+  ctx.setLineDash([]);
+  const tickY = GH * CFG.ENEMY_ZONE_BTM;
+  for (let tx = 0; tx < GW; tx += 60) {
+    ctx.beginPath();
+    ctx.moveTo(tx, tickY - 4);
+    ctx.lineTo(tx, tickY + 4);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -1726,6 +2003,7 @@ function updateTopBar() {
   timerN.className   = frac < 0.25 ? 'warning' : '';
   timerF.style.width = (frac * 100).toFixed(1) + '%';
   timerF.className   = frac < 0.25 ? 'warning' : '';
+  updateXPBar();
 }
 
 function updateStatsPanel() {
@@ -1815,10 +2093,6 @@ function remapHand(rawVal, lo, hi) {
 }
 
 function setHandTargets(landmarks) {
-  // Guard: landmarks must be a full 21-point array with finite coordinates.
-  // A malformed/partial frame (e.g. MediaPipe returning NaN or undefined for
-  // a partially-detected hand) would otherwise push NaN into player.tx/ty,
-  // which collapses to 0 after Math.max/min and teleports the ship top-left.
   if (!Array.isArray(landmarks) || landmarks.length < 21) return;
   const tip = landmarks[8];
   if (!tip || !isFinite(tip.x) || !isFinite(tip.y)) return;
@@ -2295,7 +2569,16 @@ function loop(now) {
 // BOOT
 // ================================================================
 initHandViewer();
+loadPersist();
+updateXPBar();
 connectWS();
 initGame();
 kbShortcutsEl.style.display = 'flex';   // always visible
+
+// Skill tree close button
+document.getElementById('st-close-btn').addEventListener('click', () => {
+  hideSkillTree();
+  showWeaponSelect();
+});
+
 requestAnimationFrame(loop);
