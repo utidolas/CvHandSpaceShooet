@@ -73,38 +73,52 @@ const CFG = {
 // ================================================================
 // XP / LEVEL / PERSISTENT SKILL TREE
 // ================================================================
-const XP_PER_LEVEL = 200;  // flat XP per level
+// XP needed to go from level N to N+1:  floor(80 × N^1.4)
+// Level 1→2: 80  |  2→3: 188  |  3→4: 327  |  5→6: 680  |  10→11: 1599
+function xpForNextLevel(lv) { return Math.floor(80 * Math.pow(lv, 1.4)); }
+
+// XP per enemy kill — scales with wave
+// wave 1: 15  |  wave 5: 87  |  wave 10: 200  |  wave 20: 479
+function killXP(w) { return Math.round(15 * Math.pow(w, 1.2)); }
+
+// XP bonus for clearing a wave — scales with wave^1.4
+// wave 1: 100  |  wave 5: 765  |  wave 10: 1985  |  wave 20: 5154
+function waveXP(w) { return Math.round(100 * Math.pow(w, 1.4)); }
 
 // Three paths, four nodes each.
-// stat keys: maxHp (%), damage (%), atkSpeed (%), critChance (abs),
-//            critMult (abs), moveSpeed (%), bulletSpeed (%), dmgReduce (abs),
-//            orbHeal (abs), orbDrop (abs)
+// Three paths, six nodes each. Bonuses persist across all runs.
 const SKILL_TREE = [
   {
     id: 'defense', label: 'DEFENSE', color: '#5a90e0', icon: '\u26CA',
     nodes: [
-      { id:'def_1', name:'Hull Plating',    icon:'\u2B21', desc:'Reinforce outer hull layers',          stat:'maxHp',     val:0.15, cost:1, req:null    },
-      { id:'def_2', name:'Bulkhead',         icon:'\u29EB', desc:'Reduce all incoming damage by 10%',    stat:'dmgReduce', val:0.10, cost:2, req:'def_1' },
-      { id:'def_3', name:'Boiler Fortress',  icon:'\u2699', desc:'Massive secondary hull expansion',     stat:'maxHp',     val:0.30, cost:2, req:'def_2' },
-      { id:'def_4', name:'Titan Chassis',    icon:'\u2736', desc:'Near-impenetrable plating layers',     stat:'dmgReduce', val:0.15, cost:3, req:'def_3' },
+      { id:'def_1', name:'Hull Plating',    icon:'\u2B21', desc:'Reinforce outer hull layers',        stat:'maxHp',     val:0.15, cost:1, req:null    },
+      { id:'def_2', name:'Bulkhead',         icon:'\u29EB', desc:'Reduce bullet damage by 10%',        stat:'dmgReduce', val:0.10, cost:1, req:'def_1' },
+      { id:'def_3', name:'Boiler Fortress',  icon:'\u2699', desc:'Massive secondary hull expansion',   stat:'maxHp',     val:0.25, cost:2, req:'def_2' },
+      { id:'def_4', name:'Blast Dampener',   icon:'\u25CE', desc:'Reduce bullet damage by 8%',         stat:'dmgReduce', val:0.08, cost:2, req:'def_3' },
+      { id:'def_5', name:'Iron Cathedral',   icon:'\u2736', desc:'Titan-grade hull reinforcement',     stat:'maxHp',     val:0.40, cost:3, req:'def_4' },
+      { id:'def_6', name:'Titan Chassis',    icon:'\u2654', desc:'Near-impenetrable plating layers',   stat:'dmgReduce', val:0.15, cost:3, req:'def_5' },
     ]
   },
   {
     id: 'attack', label: 'ATTACK', color: '#e05a5a', icon: '\u2694',
     nodes: [
-      { id:'atk_1', name:'Refined Powder',  icon:'\u25C6', desc:'Higher-grade propellant charge',       stat:'damage',    val:0.10, cost:1, req:null    },
-      { id:'atk_2', name:'Hair Trigger',     icon:'\u25CE', desc:'Faster firing mechanism cycle',        stat:'atkSpeed',  val:0.10, cost:2, req:'atk_1' },
-      { id:'atk_3', name:'Precision Sight',  icon:'\u2726', desc:'Improved critical hit chance +8%',     stat:'critChance',val:0.08, cost:2, req:'atk_2' },
-      { id:'atk_4', name:'Volatile Core',    icon:'\u2605', desc:'Devastating critical strike damage',   stat:'critMult',  val:0.30, cost:3, req:'atk_3' },
+      { id:'atk_1', name:'Refined Powder',  icon:'\u25C6', desc:'Higher-grade propellant charge',     stat:'damage',    val:0.10, cost:1, req:null    },
+      { id:'atk_2', name:'Hair Trigger',     icon:'\u25CE', desc:'Faster firing mechanism cycle',      stat:'atkSpeed',  val:0.10, cost:1, req:'atk_1' },
+      { id:'atk_3', name:'Precision Sight',  icon:'\u2726', desc:'Improved critical hit chance',       stat:'critChance',val:0.08, cost:2, req:'atk_2' },
+      { id:'atk_4', name:'Volatile Core',    icon:'\u2605', desc:'Devastating critical hit damage',    stat:'critMult',  val:0.25, cost:2, req:'atk_3' },
+      { id:'atk_5', name:'Arcane Charge',    icon:'\u25C6', desc:'Elite propellant charge mix',        stat:'damage',    val:0.15, cost:3, req:'atk_4' },
+      { id:'atk_6', name:'Inferno Chamber',  icon:'\u2726', desc:'Precision crit targeting system',    stat:'critChance',val:0.10, cost:3, req:'atk_5' },
     ]
   },
   {
     id: 'utility', label: 'UTILITY', color: '#50d4a0', icon: '\u2699',
     nodes: [
-      { id:'utl_1', name:'Steam Turbine',   icon:'\u26A1', desc:'Boost thruster output for +10% speed', stat:'moveSpeed', val:0.10, cost:1, req:null    },
-      { id:'utl_2', name:'Medic Orbs',       icon:'\u2665', desc:'Orbs heal +2% more HP on pickup',      stat:'orbHeal',   val:0.02, cost:2, req:'utl_1' },
-      { id:'utl_3', name:'Aether Propellant',icon:'\u27A4', desc:'Faster projectile velocity +12%',      stat:'bulletSpeed',val:0.12,cost:2, req:'utl_2' },
-      { id:'utl_4', name:'Fortune Gears',    icon:'\u29BE', desc:'Higher chance for health orb drops',   stat:'orbDrop',   val:0.10, cost:3, req:'utl_3' },
+      { id:'utl_1', name:'Steam Turbine',   icon:'\u26A1', desc:'Boost thruster output',              stat:'moveSpeed', val:0.10, cost:1, req:null    },
+      { id:'utl_2', name:'Medic Orbs',       icon:'\u2665', desc:'Orbs heal +2% more HP on pickup',    stat:'orbHeal',   val:0.02, cost:1, req:'utl_1' },
+      { id:'utl_3', name:'Aether Fuel',      icon:'\u27A4', desc:'Faster projectile velocity',         stat:'bulletSpeed',val:0.12,cost:2, req:'utl_2' },
+      { id:'utl_4', name:'Fortune Gears',    icon:'\u29BE', desc:'Higher chance for health orb drops', stat:'orbDrop',   val:0.10, cost:2, req:'utl_3' },
+      { id:'utl_5', name:'Overdrive',        icon:'\u26A1', desc:'Extreme thruster overdrive',         stat:'moveSpeed', val:0.15, cost:3, req:'utl_4' },
+      { id:'utl_6', name:'Vital Essence',    icon:'\u2665', desc:'Orbs heal an additional +3% HP',     stat:'orbHeal',   val:0.03, cost:3, req:'utl_5' },
     ]
   },
 ];
@@ -139,8 +153,33 @@ function savePersist() {
   } catch(e) { /* ignore */ }
 }
 
-function calcLevel(xp) { return Math.floor(xp / XP_PER_LEVEL) + 1; }
-function xpIntoCurrentLevel(xp) { return xp % XP_PER_LEVEL; }
+// Walk upward from level 1, consuming xpForNextLevel each step.
+function calcLevel(xp) {
+  let lv = 1, remaining = xp;
+  while (remaining >= xpForNextLevel(lv)) {
+    remaining -= xpForNextLevel(lv);
+    lv++;
+  }
+  return lv;
+}
+// XP already spent inside the current level bracket.
+function xpIntoCurrentLevel(xp) {
+  let remaining = xp, lv = 1;
+  while (remaining >= xpForNextLevel(lv)) {
+    remaining -= xpForNextLevel(lv);
+    lv++;
+  }
+  return remaining;
+}
+// XP threshold for the current level bracket (used for progress bar width).
+function xpNeededThisLevel(xp) {
+  let remaining = xp, lv = 1;
+  while (remaining >= xpForNextLevel(lv)) {
+    remaining -= xpForNextLevel(lv);
+    lv++;
+  }
+  return xpForNextLevel(lv);
+}
 
 function getSpentSP() {
   let spent = 0;
@@ -170,7 +209,11 @@ function updateXPBar() {
   const fillEl = document.getElementById('xp-fill');
   const spEl   = document.getElementById('xp-sp');
   if (lvlEl)  lvlEl.textContent  = PERSIST.level;
-  if (fillEl) fillEl.style.width = ((xpIntoCurrentLevel(PERSIST.totalXP) / XP_PER_LEVEL) * 100).toFixed(1) + '%';
+  if (fillEl) {
+    const into    = xpIntoCurrentLevel(PERSIST.totalXP);
+    const needed  = xpNeededThisLevel(PERSIST.totalXP);
+    fillEl.style.width = ((into / needed) * 100).toFixed(1) + '%';
+  }
   if (spEl)   spEl.textContent   = getAvailableSP() + ' SP';
 }
 
@@ -190,107 +233,320 @@ function applySkillBonuses() {
   let hpMult = 1.0, dmgReduce = 0;
   if (s.def_1) hpMult    += 0.15;
   if (s.def_2) dmgReduce += 0.10;
-  if (s.def_3) hpMult    += 0.30;
-  if (s.def_4) dmgReduce += 0.15;
+  if (s.def_3) hpMult    += 0.25;
+  if (s.def_4) dmgReduce += 0.08;
+  if (s.def_5) hpMult    += 0.40;
+  if (s.def_6) dmgReduce += 0.15;
 
   let dmgMult = 1.0, atkMult = 1.0, critBonus = 0, critMultBonus = 0;
-  if (s.atk_1) dmgMult      += 0.10;
-  if (s.atk_2) atkMult      += 0.10;
-  if (s.atk_3) critBonus    += 0.08;
-  if (s.atk_4) critMultBonus += 0.30;
+  if (s.atk_1) dmgMult       += 0.10;
+  if (s.atk_2) atkMult       += 0.10;
+  if (s.atk_3) critBonus     += 0.08;
+  if (s.atk_4) critMultBonus += 0.25;
+  if (s.atk_5) dmgMult       += 0.15;
+  if (s.atk_6) critBonus     += 0.10;
 
   let speedMult = 1.0, orbHealBonus = 0, bspeedMult = 1.0, orbDropBonus = 0;
   if (s.utl_1) speedMult    += 0.10;
   if (s.utl_2) orbHealBonus += 0.02;
   if (s.utl_3) bspeedMult   += 0.12;
   if (s.utl_4) orbDropBonus += 0.10;
+  if (s.utl_5) speedMult    += 0.15;
+  if (s.utl_6) orbHealBonus += 0.03;
 
   const baseHp = Math.round(CFG.BASE_HP * hpMult);
-  player.hp          = baseHp;
-  player.maxHp       = baseHp;
-  player.damage      = Math.round(CFG.BASE_DAMAGE * dmgMult);
-  player.atkSpeed    = CFG.BASE_ATK_SPEED * atkMult;
-  player.critChance  = Math.min(0.95, CFG.BASE_CRIT_CHANCE + critBonus);
-  player.critMult    = CFG.BASE_CRIT_MULT + critMultBonus;
-  player.moveSpeed   = 1.0 * speedMult;
-  player.bulletSpeed = CFG.BASE_BULLET_SPEED * bspeedMult;
-  player.dmgReduce   = dmgReduce;
+  player.hp           = baseHp;
+  player.maxHp        = baseHp;
+  player.damage       = Math.round(CFG.BASE_DAMAGE * dmgMult);
+  player.skillAtkMult = atkMult;            // ← saved so applyWeapon can use it
+  player.atkSpeed     = CFG.BASE_ATK_SPEED * atkMult;
+  player.critChance   = Math.min(0.95, CFG.BASE_CRIT_CHANCE + critBonus);
+  player.critMult     = CFG.BASE_CRIT_MULT + critMultBonus;
+  player.moveSpeed    = 1.0 * speedMult;
+  player.bulletSpeed  = CFG.BASE_BULLET_SPEED * bspeedMult;
+  player.dmgReduce    = dmgReduce;
   player.orbHealBonus = orbHealBonus;
   player.orbDropBonus = orbDropBonus;
 }
 
-// ---- Skill tree UI ----
+// ================================================================
+// SKILL TREE — POE-STYLE ENGINE CANVAS RENDERER
+// ================================================================
 function isNodeUnlocked(node) {
   if (!node.req) return true;
   return !!PERSIST.skills[node.req];
 }
+const ST_W = 840, ST_H = 540;
+const ST_NR = 28;   // node gear outer radius
+const ST_HR = 40;   // hub gear outer radius
+const ST_HUB = { x: 420, y: 52 };
+
+// Canvas positions: [path_id] → [[cx,cy], ...] (6 nodes each)
+const ST_POS = {
+  defense: [[120,148],[120,213],[120,278],[120,343],[120,408],[120,468]],
+  attack:  [[420,148],[420,213],[420,278],[420,343],[420,408],[420,468]],
+  utility: [[720,148],[720,213],[720,278],[720,343],[720,408],[720,468]],
+};
+
+let _stCv = null, _stCx = null, _stRaf = null, _stHover = null;
+
+function _stGear(ctx, cx, cy, outerR, innerR, teeth, angle) {
+  ctx.beginPath();
+  for (let i = 0; i < teeth * 2; i++) {
+    const a = (i / (teeth * 2)) * Math.PI * 2 + angle;
+    const r = i % 2 === 0 ? outerR : innerR;
+    i === 0 ? ctx.moveTo(cx + r*Math.cos(a), cy + r*Math.sin(a))
+            : ctx.lineTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+function _stPipe(ctx, x1, y1, x2, y2, active, color) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = active ? color+'33' : '#150d05';
+  ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.strokeStyle = active ? color+'77' : '#231208';
+  ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.strokeStyle = active ? color+'bb' : '#1a0d04';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  const dist = Math.hypot(x2-x1, y2-y1);
+  const n = Math.max(0, Math.floor(dist/50) - 1);
+  for (let i = 1; i <= n; i++) {
+    const t = i/(n+1), rx = x1+(x2-x1)*t, ry = y1+(y2-y1)*t;
+    ctx.fillStyle   = active ? '#c8860a' : '#1e0e06';
+    ctx.strokeStyle = active ? '#e8a020' : '#0e0804';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(rx, ry, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = active ? '#f0d08088' : '#0a0604';
+    ctx.beginPath(); ctx.arc(rx-1.2, ry-1.2, 2, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function _stNodeGear(ctx, cx, cy, node, pathColor, angle, t) {
+  const r = ST_NR, sp = getAvailableSP();
+  const purchased = !!PERSIST.skills[node.id];
+  const unlocked  = isNodeUnlocked(node);
+  const available = unlocked && !purchased && sp >= node.cost;
+  const c = pathColor;
+  ctx.save();
+  if (purchased)       { ctx.shadowColor = c; ctx.shadowBlur = 22; }
+  else if (available)  { ctx.shadowColor = c; ctx.shadowBlur = 5 + Math.sin(t*2.6)*4; }
+  _stGear(ctx, cx, cy, r, r*0.74, 8, angle);
+  ctx.fillStyle   = purchased ? '#3c1e0a' : available ? '#1a0e06' : '#0c0806';
+  ctx.fill();
+  ctx.strokeStyle = purchased ? c : available ? c+'99' : '#2a1608';
+  ctx.lineWidth   = purchased ? 2.5 : available ? 2 : 1.5;
+  ctx.stroke();
+  ctx.shadowBlur  = 0;
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.60, 0, Math.PI*2);
+  ctx.fillStyle   = purchased ? '#2c1608' : available ? '#160c04' : '#080604';
+  ctx.fill();
+  ctx.strokeStyle = purchased ? c+'aa' : available ? c+'33' : '#1a0a04';
+  ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.font = `${Math.round(r*0.56)}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = purchased ? c : available ? c+'cc' : '#382010';
+  ctx.fillText(node.icon, cx, cy+1);
+  ctx.font = `bold 7px "Share Tech Mono", monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = purchased ? c : available ? '#906840' : '#2a1608';
+  ctx.fillText(node.name.toUpperCase().slice(0,13), cx, cy+r+5);
+  const bx = cx+r*0.72, by = cy-r*0.72;
+  ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI*2);
+  ctx.fillStyle   = purchased ? c : available ? '#c8860a' : '#180e06';
+  ctx.fill();
+  ctx.strokeStyle = purchased ? c+'aa' : available ? '#e8a020' : '#0e0804';
+  ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = purchased ? '#0a0604' : available ? '#fffbe8' : '#3a2010';
+  ctx.font = `bold ${purchased?9:8}px "Share Tech Mono", monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(purchased ? '\u2713' : node.cost, bx, by);
+  ctx.restore();
+}
+
+function _stHub(ctx, t) {
+  const {x, y} = ST_HUB, r = ST_HR;
+  ctx.save();
+  ctx.shadowColor = '#e8a020'; ctx.shadowBlur = 32;
+  _stGear(ctx, x, y, r, r*0.76, 14, t*0.28);
+  ctx.fillStyle = '#3a1e08'; ctx.fill();
+  ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(x, y, r*0.56, 0, Math.PI*2);
+  ctx.fillStyle = '#1a0e04'; ctx.fill();
+  ctx.strokeStyle = '#c8860a'; ctx.lineWidth = 2; ctx.stroke();
+  _stGear(ctx, x, y, r*0.42, r*0.30, 8, -t*0.56);
+  ctx.fillStyle = '#2a1408'; ctx.fill();
+  ctx.strokeStyle = '#c8860a'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#e8a020';
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#e8a020';
+  ctx.font = `bold 7px "Share Tech Mono", monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('ENGINE', x, y-5); ctx.fillText('CORE', x, y+5);
+  ctx.restore();
+}
+
+function _stTooltip(ctx, node, path, nx, ny) {
+  const sp = getAvailableSP();
+  const purchased  = !!PERSIST.skills[node.id];
+  const unlocked   = isNodeUnlocked(node);
+  const affordable = sp >= node.cost;
+  const statusTxt  = purchased  ? '\u2713 PURCHASED'
+    : !unlocked    ? '\u26A0 LOCKED \u2014 BUY PREVIOUS NODE'
+    : !affordable  ? `NEED ${node.cost} SP (HAVE ${sp})`
+    : `CLICK TO PURCHASE  \u2022  ${node.cost} SP`;
+  const statusCol = purchased ? '#50d4a0' : (!unlocked||!affordable) ? '#6a4030' : '#e8a020';
+  const tw=215, th=86, pad=10;
+  let tx = nx+ST_NR+14, ty = ny-th/2;
+  if (tx+tw > ST_W-6) tx = nx-ST_NR-tw-14;
+  if (ty < 4) ty = 4;
+  if (ty+th > ST_H-4) ty = ST_H-th-4;
+  ctx.save();
+  ctx.fillStyle = 'rgba(7,4,2,0.97)';
+  ctx.strokeStyle = path.color; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(tx+4,ty); ctx.lineTo(tx+tw-4,ty); ctx.arcTo(tx+tw,ty,tx+tw,ty+4,4);
+  ctx.lineTo(tx+tw,ty+th-4); ctx.arcTo(tx+tw,ty+th,tx+tw-4,ty+th,4);
+  ctx.lineTo(tx+4,ty+th); ctx.arcTo(tx,ty+th,tx,ty+th-4,4);
+  ctx.lineTo(tx,ty+4); ctx.arcTo(tx,ty,tx+4,ty,4);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  let ly = ty+pad;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.font = `bold 9px "Share Tech Mono", monospace`;
+  ctx.fillStyle = path.color; ctx.fillText(node.name.toUpperCase(), tx+pad, ly); ly+=14;
+  ctx.font = `8px "Share Tech Mono", monospace`;
+  ctx.fillStyle = '#8a7050'; ctx.fillText(node.desc, tx+pad, ly); ly+=13;
+  ctx.fillStyle = path.color; ctx.fillText(formatSkillVal(node), tx+pad, ly); ly+=13;
+  ctx.fillStyle = statusCol; ctx.font = `7px "Share Tech Mono", monospace`;
+  ctx.fillText(statusTxt, tx+pad, ly);
+  ctx.restore();
+}
+
+function _stRender(ts) {
+  if (!_stCv) return;
+  const ctx = _stCx, W = ST_W, H = ST_H, t = ts*0.001;
+  ctx.fillStyle = '#060408'; ctx.fillRect(0,0,W,H);
+  const g0 = ctx.createRadialGradient(ST_HUB.x,ST_HUB.y,0,ST_HUB.x,ST_HUB.y,320);
+  g0.addColorStop(0,'rgba(232,160,32,0.055)'); g0.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g0; ctx.fillRect(0,0,W,H);
+  for (const path of SKILL_TREE) {
+    const [fx] = ST_POS[path.id][0];
+    const gp = ctx.createRadialGradient(fx,H/2,0,fx,H/2,230);
+    gp.addColorStop(0,path.color+'0a'); gp.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gp; ctx.fillRect(0,0,W,H);
+  }
+  // Decorative small junction gears between paths
+  const jx1 = (ST_POS.defense[0][0]+ST_POS.attack[0][0])/2;
+  const jx2 = (ST_POS.attack[0][0]+ST_POS.utility[0][0])/2;
+  const jy  = ST_POS.defense[0][1];
+  for (const [jx, spd] of [[jx1, -0.7],[jx2, 0.7]]) {
+    ctx.save();
+    _stGear(ctx, jx, jy, 13, 9, 7, t*spd);
+    ctx.fillStyle='#1a0d05'; ctx.fill();
+    ctx.strokeStyle='#342010'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(jx,jy,4,0,Math.PI*2);
+    ctx.fillStyle='#0e0804'; ctx.fill();
+    ctx.restore();
+  }
+  // Hub-to-first-node pipes
+  for (const path of SKILL_TREE) {
+    const [fx,fy] = ST_POS[path.id][0];
+    const act = !!PERSIST.skills[path.nodes[0].id];
+    _stPipe(ctx, ST_HUB.x, ST_HUB.y+ST_HR+2, fx, fy-ST_NR-2, act, path.color);
+  }
+  // Inter-node pipes
+  for (const path of SKILL_TREE) {
+    const pos = ST_POS[path.id];
+    for (let ni=0; ni<path.nodes.length-1; ni++) {
+      const [x1,y1]=pos[ni], [x2,y2]=pos[ni+1];
+      const act = !!PERSIST.skills[path.nodes[ni].id];
+      _stPipe(ctx, x1, y1+ST_NR+2, x2, y2-ST_NR-2, act, path.color);
+    }
+  }
+  // Path labels
+  for (const path of SKILL_TREE) {
+    const [lx] = ST_POS[path.id][0];
+    ctx.save();
+    ctx.fillStyle = path.color+'cc';
+    ctx.font = `bold 9px "Share Tech Mono", monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(`\u2500\u2500 ${path.label} \u2500\u2500`, lx, 120);
+    ctx.restore();
+  }
+  // Hub (drawn on top of pipe ends)
+  _stHub(ctx, t);
+  // Nodes
+  for (let pi=0; pi<SKILL_TREE.length; pi++) {
+    const path = SKILL_TREE[pi], pos = ST_POS[path.id];
+    const phase = pi * Math.PI * 0.9;
+    for (let ni=0; ni<path.nodes.length; ni++) {
+      const [cx,cy] = pos[ni];
+      const angle = (ni%2===0 ? -1 : 1) * t * 0.44 + phase + ni*0.22;
+      _stNodeGear(ctx, cx, cy, path.nodes[ni], path.color, angle, t);
+    }
+  }
+  // Hover tooltip (topmost layer)
+  if (_stHover) {
+    const {pi, ni} = _stHover;
+    const path = SKILL_TREE[pi];
+    const [nx,ny] = ST_POS[path.id][ni];
+    _stTooltip(ctx, path.nodes[ni], path, nx, ny);
+  }
+  _stRaf = requestAnimationFrame(_stRender);
+}
+
+function _stInitCanvas() {
+  if (_stCv) return;
+  _stCv = document.getElementById('st-canvas');
+  if (!_stCv) return;
+  _stCx = _stCv.getContext('2d');
+  _stCv.addEventListener('mousemove', e => {
+    const rect = _stCv.getBoundingClientRect();
+    const sx = ST_W/rect.width, sy = ST_H/rect.height;
+    const mx = (e.clientX-rect.left)*sx, my = (e.clientY-rect.top)*sy;
+    _stHover = null;
+    outer: for (let pi=0; pi<SKILL_TREE.length; pi++) {
+      const pos = ST_POS[SKILL_TREE[pi].id];
+      for (let ni=0; ni<SKILL_TREE[pi].nodes.length; ni++) {
+        const [cx,cy] = pos[ni];
+        if (Math.hypot(mx-cx, my-cy) < ST_NR+10) { _stHover={pi,ni}; break outer; }
+      }
+    }
+    _stCv.style.cursor = _stHover ? 'pointer' : 'default';
+  });
+  _stCv.addEventListener('mouseleave', () => { _stHover = null; });
+  _stCv.addEventListener('click', () => {
+    if (_stHover) purchaseSkill(SKILL_TREE[_stHover.pi].nodes[_stHover.ni]);
+  });
+}
 
 function renderSkillTree() {
   const sp = getAvailableSP();
-  document.getElementById('st-sp').textContent  = `${sp} SP AVAILABLE`;
-  document.getElementById('st-lvl').textContent = `LEVEL ${PERSIST.level}`;
-
-  for (const path of SKILL_TREE) {
-    const col = document.getElementById(`st-col-${path.id}`);
-    if (!col) continue;
-    col.innerHTML = `<div class="st-path-title" style="color:${path.color}">${path.icon} ${path.label}</div>`;
-
-    for (let ni = 0; ni < path.nodes.length; ni++) {
-      const node = path.nodes[ni];
-      const purchased  = !!PERSIST.skills[node.id];
-      const unlocked   = isNodeUnlocked(node);
-      const affordable = sp >= node.cost;
-      const canBuy = unlocked && !purchased && affordable;
-      const locked = !unlocked || (!purchased && !affordable);
-
-      const fmtVal = formatSkillVal(node);
-
-      const card = document.createElement('div');
-      card.className = 'st-node' +
-        (purchased ? ' st-purchased' : '') +
-        (canBuy    ? ' st-available' : '') +
-        (locked && !purchased ? ' st-locked' : '');
-      card.style.borderColor = purchased ? path.color : (canBuy ? path.color : '');
-      card.innerHTML =
-        `<div class="st-node-top">` +
-          `<span class="st-icon" style="color:${purchased?path.color:'inherit'}">${node.icon}</span>` +
-          `<span class="st-name">${node.name}</span>` +
-          `<span class="st-cost">${purchased ? '\u2713' : node.cost + ' SP'}</span>` +
-        `</div>` +
-        `<div class="st-desc">${node.desc}</div>` +
-        `<div class="st-val" style="color:${path.color}">${fmtVal}</div>`;
-
-      if (canBuy) {
-        card.addEventListener('click', () => purchaseSkill(node));
-      }
-
-      col.appendChild(card);
-
-      // Connector arrow between nodes
-      if (ni < path.nodes.length - 1) {
-        const arrow = document.createElement('div');
-        arrow.className = 'st-arrow';
-        arrow.style.color = path.color;
-        arrow.innerHTML = '\u2193';
-        col.appendChild(arrow);
-      }
-    }
-  }
+  const el = document.getElementById('st-sp');
+  const ll = document.getElementById('st-lvl');
+  if (el) el.textContent = `${sp} SP AVAILABLE`;
+  if (ll) ll.textContent = `LEVEL ${PERSIST.level}`;
 }
 
 function formatSkillVal(node) {
   switch (node.stat) {
-    case 'maxHp':      return `+${Math.round(node.val * 100)}% MAX HP`;
-    case 'dmgReduce':  return `\u2212${Math.round(node.val * 100)}% DAMAGE TAKEN`;
-    case 'damage':     return `+${Math.round(node.val * 100)}% DAMAGE`;
-    case 'atkSpeed':   return `+${Math.round(node.val * 100)}% FIRE RATE`;
-    case 'critChance': return `+${Math.round(node.val * 100)}% CRIT CHANCE`;
-    case 'critMult':   return `+${Math.round(node.val * 100)}% CRIT DMG`;
-    case 'moveSpeed':  return `+${Math.round(node.val * 100)}% MOVE SPEED`;
-    case 'orbHeal':    return `+${Math.round(node.val * 100)}% ORB HEAL`;
-    case 'bulletSpeed':return `+${Math.round(node.val * 100)}% SHOT SPEED`;
-    case 'orbDrop':    return `+${Math.round(node.val * 100)}% ORB DROP RATE`;
-    default:           return '';
+    case 'maxHp':       return `+${Math.round(node.val*100)}% MAX HP`;
+    case 'dmgReduce':   return `\u2212${Math.round(node.val*100)}% DAMAGE TAKEN`;
+    case 'damage':      return `+${Math.round(node.val*100)}% DAMAGE`;
+    case 'atkSpeed':    return `+${Math.round(node.val*100)}% FIRE RATE`;
+    case 'critChance':  return `+${Math.round(node.val*100)}% CRIT CHANCE`;
+    case 'critMult':    return `+${Math.round(node.val*100)}% CRIT DMG`;
+    case 'moveSpeed':   return `+${Math.round(node.val*100)}% MOVE SPEED`;
+    case 'orbHeal':     return `+${Math.round(node.val*100)}% ORB HEAL`;
+    case 'bulletSpeed': return `+${Math.round(node.val*100)}% SHOT SPEED`;
+    case 'orbDrop':     return `+${Math.round(node.val*100)}% ORB DROP RATE`;
+    default:            return '';
   }
 }
 
@@ -300,16 +556,20 @@ function purchaseSkill(node) {
   if (getAvailableSP() < node.cost) return;
   PERSIST.skills[node.id] = true;
   savePersist();
+  applySkillBonuses();   // apply immediately so stats update live
   renderSkillTree();
 }
 
 function showSkillTree() {
+  _stInitCanvas();
   renderSkillTree();
   document.getElementById('skilltree-overlay').classList.add('visible');
+  if (!_stRaf) _stRaf = requestAnimationFrame(_stRender);
 }
 
 function hideSkillTree() {
   document.getElementById('skilltree-overlay').classList.remove('visible');
+  if (_stRaf) { cancelAnimationFrame(_stRaf); _stRaf = null; }
 }
 
 // ================================================================
@@ -821,7 +1081,8 @@ function refreshWeaponCardsUnlockedState() {
 
 function applyWeapon(wep) {
   player.weapon   = wep.id;
-  player.atkSpeed = CFG.BASE_ATK_SPEED * wep.atkMult;
+  // Combine skill-tree atk multiplier with weapon multiplier so tree bonuses are respected
+  player.atkSpeed = CFG.BASE_ATK_SPEED * (player.skillAtkMult || 1.0) * wep.atkMult;
   shootTimer      = 1 / player.atkSpeed;
   hideOverlay('weapon-overlay');
   gameState = 'playing';
@@ -1165,7 +1426,7 @@ function fireTeslaBeam(dmgMult) {
       if (Math.random() < CFG.ORB_DROP_CHANCE + (player.orbDropBonus || 0)) spawnOrb(ex, e.y);
       enemies.splice(ei, 1);
       score += 10 * wave;
-      addXP(5 + wave);
+      addXP(killXP(wave));
       updateTopBar();
     }
   }
@@ -1295,7 +1556,9 @@ function update(dt) {
   if (maxEX > GW - 20 || minEX < 20) {
     groupDir *= -1;
     groupX   += groupDir * CFG.FORMATION_SPEED * dt * 2;
-    for (const e of enemies) e.y += CFG.FORMATION_DIP;
+    for (const e of enemies) {
+      e.y = Math.min(e.y + CFG.FORMATION_DIP, GH * CFG.ENEMY_ZONE_BTM - e.r - 6);
+    }
   }
 
   // Enemy update: rotate + shoot
@@ -1359,7 +1622,7 @@ function update(dt) {
 
   // Wave cleared
   if (enemies.length === 0) {
-    addXP(wave * 10);   // wave-clear bonus
+    addXP(waveXP(wave));   // wave-clear bonus scales with wave^1.5
     gameState = 'upgrading';
     setTimeout(showUpgradeCards, 400);
   }
@@ -1421,7 +1684,7 @@ function checkBulletEnemyHits() {
         if (Math.random() < CFG.ORB_DROP_CHANCE + (player.orbDropBonus || 0)) spawnOrb(ex, e.y);
         enemies.splice(ei, 1);
         score += 10 * wave;
-        addXP(5 + wave);
+        addXP(killXP(wave));
         updateTopBar();
       }
 
@@ -1477,9 +1740,12 @@ function updateOrbs(dt) {
 }
 
 function damagePlayer(amount, isTimerPenalty) {
-  const reduced = Math.round(amount * (1 - (player.dmgReduce || 0)));
+  // Defence tree reduction applies only to enemy fire, NOT the wave-timer penalty
+  const reduced = isTimerPenalty
+    ? amount
+    : Math.round(amount * (1 - (player.dmgReduce || 0)));
   player.hp = Math.max(0, player.hp - reduced);
-  player.invulTimer = 1.0;   // 1 second invulnerability
+  player.invulTimer = 1.0;
   screenFlash = 1.0;
   spawnParticles(player.x, player.y, '#ff3030', 7);
   if (isTimerPenalty) {
@@ -1585,36 +1851,18 @@ function drawBackground() {
   // Three parallax layers (already updated in update())
   drawParallax();
 
-  // Zone separator — visible tactical line
+  // Zone separator — clean glowing line
   ctx.save();
-  // Soft glow layer
-  ctx.strokeStyle = 'rgba(200,134,10,0.12)';
-  ctx.lineWidth   = 6;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(0, GH * CFG.ENEMY_ZONE_BTM);
-  ctx.lineTo(GW, GH * CFG.ENEMY_ZONE_BTM);
-  ctx.stroke();
-  // Main dashed line
+  const sepY = GH * CFG.ENEMY_ZONE_BTM;
+  ctx.shadowColor = 'rgba(232,160,32,0.70)';
+  ctx.shadowBlur  = 8;
   ctx.strokeStyle = 'rgba(232,160,32,0.55)';
-  ctx.lineWidth   = 1.5;
-  ctx.setLineDash([10, 8]);
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([]);
   ctx.beginPath();
-  ctx.moveTo(0, GH * CFG.ENEMY_ZONE_BTM);
-  ctx.lineTo(GW, GH * CFG.ENEMY_ZONE_BTM);
+  ctx.moveTo(0, sepY);
+  ctx.lineTo(GW, sepY);
   ctx.stroke();
-  // Small tick marks
-  ctx.strokeStyle = 'rgba(232,160,32,0.80)';
-  ctx.lineWidth   = 1.5;
-  ctx.setLineDash([]);
-  const tickY = GH * CFG.ENEMY_ZONE_BTM;
-  for (let tx = 0; tx < GW; tx += 60) {
-    ctx.beginPath();
-    ctx.moveTo(tx, tickY - 4);
-    ctx.lineTo(tx, tickY + 4);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
   ctx.restore();
 }
 
@@ -2093,6 +2341,10 @@ function remapHand(rawVal, lo, hi) {
 }
 
 function setHandTargets(landmarks) {
+  // Guard: landmarks must be a full 21-point array with finite coordinates.
+  // A malformed/partial frame (e.g. MediaPipe returning NaN or undefined for
+  // a partially-detected hand) would otherwise push NaN into player.tx/ty,
+  // which collapses to 0 after Math.max/min and teleports the ship top-left.
   if (!Array.isArray(landmarks) || landmarks.length < 21) return;
   const tip = landmarks[8];
   if (!tip || !isFinite(tip.x) || !isFinite(tip.y)) return;
@@ -2578,6 +2830,7 @@ kbShortcutsEl.style.display = 'flex';   // always visible
 // Skill tree close button
 document.getElementById('st-close-btn').addEventListener('click', () => {
   hideSkillTree();
+  applySkillBonuses();   // re-apply in case new skills were bought
   showWeaponSelect();
 });
 
