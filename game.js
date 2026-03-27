@@ -68,6 +68,12 @@ const CFG = {
   // How many fingers must be "not extended" before thumb direction means anything.
   // Loose check: tip.y > MCP.y - 0.04 (tip not more than 4% above MCP).
   THUMB_PRECOND_FINGERS: 3,    // at least 3 of 4 non-thumb fingers must be not raised
+
+  // Aether Seeker — base turn rate (rad/s). Low = can miss; skill tree raises it
+  AETHER_TURN_RATE:    2.4,
+
+  // Tesla Lance — max enemies pierced per beam (skill tree can raise)
+  TESLA_BASE_PIERCE:   2,
 };
 
 // ================================================================
@@ -119,6 +125,17 @@ const SKILL_TREE = [
       { id:'utl_4', name:'Fortune Gears',    icon:'\u29BE', desc:'Higher chance for health orb drops', stat:'orbDrop',   val:0.10, cost:2, req:'utl_3' },
       { id:'utl_5', name:'Overdrive',        icon:'\u26A1', desc:'Extreme thruster overdrive',         stat:'moveSpeed', val:0.15, cost:3, req:'utl_4' },
       { id:'utl_6', name:'Vital Essence',    icon:'\u2665', desc:'Orbs heal an additional +3% HP',     stat:'orbHeal',   val:0.03, cost:3, req:'utl_5' },
+    ]
+  },
+  {
+    id: 'arsenal', label: 'ARSENAL', color: '#d090ff', icon: '\u2694',
+    nodes: [
+      { id:'ars_1', name:'Ricochet Spring', icon:'\u21BB', desc:'+1 bounce to Ricochet Chamber',         stat:'ricoBounce',  val:1,    cost:1, req:null    },
+      { id:'ars_2', name:'Seeker Coils',    icon:'\u2726', desc:'+tracking force to Aether Seeker',      stat:'aetherForce', val:2.2,  cost:1, req:'ars_1' },
+      { id:'ars_3', name:'Tesla Capacitor', icon:'\u26A1', desc:'+30% fire rate to Tesla Lance',         stat:'teslaAtk',    val:0.30, cost:2, req:'ars_2' },
+      { id:'ars_4', name:'Prismatic Core',  icon:'\u25C6', desc:'Tesla Lance pierces 3 enemies',         stat:'teslaPierce', val:1,    cost:2, req:'ars_3' },
+      { id:'ars_5', name:'Chaos Gearing',   icon:'\u21BB', desc:'+1 more bounce to Ricochet Chamber',   stat:'ricoBounce',  val:1,    cost:3, req:'ars_4' },
+      { id:'ars_6', name:'Seeker Override', icon:'\u2726', desc:'Aether full lock-on mode',              stat:'aetherForce', val:3.8,  cost:3, req:'ars_5' },
     ]
   },
 ];
@@ -254,6 +271,14 @@ function applySkillBonuses() {
   if (s.utl_5) speedMult    += 0.15;
   if (s.utl_6) orbHealBonus += 0.03;
 
+  let ricochetExtraBounces = 0, aetherTurnBonus = 0, teslaAtkBonus = 0, teslaPierceBonus = 0;
+  if (s.ars_1) ricochetExtraBounces += 1;
+  if (s.ars_2) aetherTurnBonus      += 2.2;
+  if (s.ars_3) teslaAtkBonus        += 0.30;
+  if (s.ars_4) teslaPierceBonus     += 1;
+  if (s.ars_5) ricochetExtraBounces += 1;
+  if (s.ars_6) aetherTurnBonus      += 3.8;
+
   const baseHp = Math.round(CFG.BASE_HP * hpMult);
   player.hp           = baseHp;
   player.maxHp        = baseHp;
@@ -267,6 +292,10 @@ function applySkillBonuses() {
   player.dmgReduce    = dmgReduce;
   player.orbHealBonus = orbHealBonus;
   player.orbDropBonus = orbDropBonus;
+  player.ricochetExtraBounces = ricochetExtraBounces;
+  player.aetherTurnBonus      = aetherTurnBonus;
+  player.teslaAtkBonus        = teslaAtkBonus;
+  player.teslaPierceBonus     = teslaPierceBonus;
 }
 
 // ================================================================
@@ -276,16 +305,16 @@ function isNodeUnlocked(node) {
   if (!node.req) return true;
   return !!PERSIST.skills[node.req];
 }
-const ST_W = 840, ST_H = 540;
-const ST_NR = 28;   // node gear outer radius
-const ST_HR = 40;   // hub gear outer radius
-const ST_HUB = { x: 420, y: 52 };
+const ST_W = 1060, ST_H = 540;
+const ST_NR = 28;
+const ST_HR = 40;
+const ST_HUB = { x: 530, y: 52 };
 
-// Canvas positions: [path_id] → [[cx,cy], ...] (6 nodes each)
 const ST_POS = {
-  defense: [[120,148],[120,213],[120,278],[120,343],[120,408],[120,468]],
-  attack:  [[420,148],[420,213],[420,278],[420,343],[420,408],[420,468]],
-  utility: [[720,148],[720,213],[720,278],[720,343],[720,408],[720,468]],
+  defense: [[115,148],[115,213],[115,278],[115,343],[115,408],[115,468]],
+  attack:  [[365,148],[365,213],[365,278],[365,343],[365,408],[365,468]],
+  utility: [[695,148],[695,213],[695,278],[695,343],[695,408],[695,468]],
+  arsenal: [[945,148],[945,213],[945,278],[945,343],[945,408],[945,468]],
 };
 
 let _stCv = null, _stCx = null, _stRaf = null, _stHover = null;
@@ -431,21 +460,27 @@ function _stTooltip(ctx, node, path, nx, ny) {
 function _stRender(ts) {
   if (!_stCv) return;
   const ctx = _stCx, W = ST_W, H = ST_H, t = ts*0.001;
+
+  // Background
   ctx.fillStyle = '#060408'; ctx.fillRect(0,0,W,H);
-  const g0 = ctx.createRadialGradient(ST_HUB.x,ST_HUB.y,0,ST_HUB.x,ST_HUB.y,320);
-  g0.addColorStop(0,'rgba(232,160,32,0.055)'); g0.addColorStop(1,'rgba(0,0,0,0)');
+  const g0 = ctx.createRadialGradient(ST_HUB.x,ST_HUB.y,0,ST_HUB.x,ST_HUB.y,420);
+  g0.addColorStop(0,'rgba(232,160,32,0.05)'); g0.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=g0; ctx.fillRect(0,0,W,H);
+
+  // Per-path column glows
   for (const path of SKILL_TREE) {
     const [fx] = ST_POS[path.id][0];
-    const gp = ctx.createRadialGradient(fx,H/2,0,fx,H/2,230);
-    gp.addColorStop(0,path.color+'0a'); gp.addColorStop(1,'rgba(0,0,0,0)');
+    const gp = ctx.createRadialGradient(fx,H/2,0,fx,H/2,190);
+    gp.addColorStop(0,path.color+'09'); gp.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=gp; ctx.fillRect(0,0,W,H);
   }
-  // Decorative small junction gears between paths
-  const jx1 = (ST_POS.defense[0][0]+ST_POS.attack[0][0])/2;
-  const jx2 = (ST_POS.attack[0][0]+ST_POS.utility[0][0])/2;
-  const jy  = ST_POS.defense[0][1];
-  for (const [jx, spd] of [[jx1, -0.7],[jx2, 0.7]]) {
+
+  // Junction gears between every adjacent pair of paths
+  const pathIds = SKILL_TREE.map(p=>p.id);
+  const jy = ST_POS[pathIds[0]][0][1];
+  for (let i=0; i<pathIds.length-1; i++) {
+    const jx = (ST_POS[pathIds[i]][0][0] + ST_POS[pathIds[i+1]][0][0]) / 2;
+    const spd = i%2===0 ? -0.7 : 0.7;
     ctx.save();
     _stGear(ctx, jx, jy, 13, 9, 7, t*spd);
     ctx.fillStyle='#1a0d05'; ctx.fill();
@@ -454,12 +489,14 @@ function _stRender(ts) {
     ctx.fillStyle='#0e0804'; ctx.fill();
     ctx.restore();
   }
-  // Hub-to-first-node pipes
+
+  // Hub-to-first-node pipes (all paths)
   for (const path of SKILL_TREE) {
     const [fx,fy] = ST_POS[path.id][0];
     const act = !!PERSIST.skills[path.nodes[0].id];
     _stPipe(ctx, ST_HUB.x, ST_HUB.y+ST_HR+2, fx, fy-ST_NR-2, act, path.color);
   }
+
   // Inter-node pipes
   for (const path of SKILL_TREE) {
     const pos = ST_POS[path.id];
@@ -469,6 +506,7 @@ function _stRender(ts) {
       _stPipe(ctx, x1, y1+ST_NR+2, x2, y2-ST_NR-2, act, path.color);
     }
   }
+
   // Path labels
   for (const path of SKILL_TREE) {
     const [lx] = ST_POS[path.id][0];
@@ -479,8 +517,10 @@ function _stRender(ts) {
     ctx.fillText(`\u2500\u2500 ${path.label} \u2500\u2500`, lx, 120);
     ctx.restore();
   }
+
   // Hub (drawn on top of pipe ends)
   _stHub(ctx, t);
+
   // Nodes
   for (let pi=0; pi<SKILL_TREE.length; pi++) {
     const path = SKILL_TREE[pi], pos = ST_POS[path.id];
@@ -491,6 +531,7 @@ function _stRender(ts) {
       _stNodeGear(ctx, cx, cy, path.nodes[ni], path.color, angle, t);
     }
   }
+
   // Hover tooltip (topmost layer)
   if (_stHover) {
     const {pi, ni} = _stHover;
@@ -546,6 +587,10 @@ function formatSkillVal(node) {
     case 'orbHeal':     return `+${Math.round(node.val*100)}% ORB HEAL`;
     case 'bulletSpeed': return `+${Math.round(node.val*100)}% SHOT SPEED`;
     case 'orbDrop':     return `+${Math.round(node.val*100)}% ORB DROP RATE`;
+    case 'ricoBounce':  return `+${node.val} RICOCHET BOUNCE`;
+    case 'aetherForce': return `+${node.val.toFixed(1)} TRACKING FORCE`;
+    case 'teslaAtk':    return `+${Math.round(node.val*100)}% TESLA FIRE RATE`;
+    case 'teslaPierce': return `+${node.val} TESLA PIERCE`;
     default:            return '';
   }
 }
@@ -600,9 +645,9 @@ const WEAPONS = [
   {
     id: 'aether', name: 'Aether Seeker',
     icon: '\u2726', color: '#7cc0ff',
-    desc: 'Homing rounds chase targets.\nLow damage per shot.',
+    desc: 'Homing rounds seek targets.\nWeak tracking — can miss. Upgradeable.',
     dmgMult: 0.40, atkMult: 2.00,
-    hint: 'Auto-tracking rounds',
+    hint: 'Soft-tracking rounds',
     unlockScore: 1000,
   },
   {
@@ -616,9 +661,9 @@ const WEAPONS = [
   {
     id: 'tesla', name: 'Tesla Lance',
     icon: '\u26A1', color: '#60e8ff',
-    desc: 'Instant beam strike.\nSlow cycle, massive burst.',
-    dmgMult: 3.90, atkMult: 0.23,
-    hint: 'Line-damage beam',
+    desc: 'Instant beam strike.\nVery slow cycle, massive burst.',
+    dmgMult: 3.50, atkMult: 0.14,
+    hint: 'Line-damage beam — pierces 2',
     unlockScore: 20000,
   },
 ];
@@ -706,12 +751,17 @@ function makePlayer() {
     bulletSpeed: CFG.BASE_BULLET_SPEED,
     weapon:      null,
     size:        CFG.SHIP_SIZE,
-    dmgReduce:   0,      // % damage reduction (from Defense skill tree)
-    orbHealBonus: 0,     // extra % heal per orb (from Utility skill tree)
-    orbDropBonus: 0,     // extra orb drop chance (from Utility skill tree)
+    dmgReduce:   0,
+    orbHealBonus: 0,
+    orbDropBonus: 0,
+    ricochetExtraBounces: 0,
+    aetherTurnBonus:      0,
+    teslaAtkBonus:        0,
+    teslaPierceBonus:     0,
+    skillAtkMult:         1.0,
     invulTimer:  0,
     burstTimer:    0,
-    teslaCooldown: 0,  // countdown in seconds until next tesla fire
+    teslaCooldown: 0,
   };
 }
 
@@ -1081,8 +1131,10 @@ function refreshWeaponCardsUnlockedState() {
 
 function applyWeapon(wep) {
   player.weapon   = wep.id;
-  // Combine skill-tree atk multiplier with weapon multiplier so tree bonuses are respected
-  player.atkSpeed = CFG.BASE_ATK_SPEED * (player.skillAtkMult || 1.0) * wep.atkMult;
+  let wepAtkMult  = wep.atkMult;
+  // Tesla Lance gets an extra fire-rate boost from the Arsenal skill tree
+  if (wep.id === 'tesla') wepAtkMult *= (1 + (player.teslaAtkBonus || 0));
+  player.atkSpeed = CFG.BASE_ATK_SPEED * (player.skillAtkMult || 1.0) * wepAtkMult;
   shootTimer      = 1 / player.atkSpeed;
   hideOverlay('weapon-overlay');
   gameState = 'playing';
@@ -1410,15 +1462,27 @@ function fireTeslaBeam(dmgMult) {
   const by = player.y - player.size * 0.8;
   const dmg = calcDamage(dmgMult);
   const beamHalfW = 26;
+  const maxPierce = CFG.TESLA_BASE_PIERCE + (player.teslaPierceBonus || 0);
 
-  for (let ei = enemies.length - 1; ei >= 0; ei--) {
+  // Sort candidates by Y descending (closest to player first) for fair pierce ordering
+  const inBeam = [];
+  for (let ei = 0; ei < enemies.length; ei++) {
     const e = enemies[ei];
     const ex = e.baseX + groupX;
     if (Math.abs(ex - bx) > e.r + beamHalfW) continue;
     if (e.y > by) continue;
+    inBeam.push(ei);
+  }
+  inBeam.sort((a, b) => enemies[b].y - enemies[a].y); // highest Y (closest) first
 
+  let pierced = 0;
+  for (const ei of inBeam) {
+    if (pierced >= maxPierce) break;
+    const e = enemies[ei];
+    const ex = e.baseX + groupX;
     e.hp -= dmg;
     e.flash = 1.0;
+    pierced++;
     spawnDmgNumber(ex + (Math.random() - 0.5) * 16, e.y - e.r - 6, dmg, _lastCrit);
     if (e.hp <= 0) {
       spawnParticles(ex, e.y, '#60e8ff', 10);
@@ -1448,7 +1512,8 @@ function spawnWeaponBullets() {
     fireBullet(bx, by, -Math.PI / 2,      mult);
     fireBullet(bx, by, -Math.PI / 2 + s,  mult);
   } else if (player.weapon === 'aether') {
-    fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: 8.8 });
+    const tr = CFG.AETHER_TURN_RATE + (player.aetherTurnBonus || 0);
+    fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: tr });
   } else if (player.weapon === 'ricochet') {
     // 150° arc (-75° to +75° from straight up), edge-biased
     // Use a U-shaped distribution: bias toward the ±75° extremes
@@ -1462,7 +1527,7 @@ function spawnWeaponBullets() {
     const wobble = sign * Math.pow(t, 0.35) * halfArc;
     fireBullet(bx, by, -Math.PI / 2 + wobble, mult, {
       type: 'ricochet',
-      bouncesLeft: 2,
+      bouncesLeft: 2 + (player.ricochetExtraBounces || 0),
       hitR: 5,
       drawR: 7,
     });

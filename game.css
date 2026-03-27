@@ -484,12 +484,14 @@
      z-index: 52;
      background: rgba(6, 5, 9, 0.96);
      align-items: center; justify-content: center;
+     overflow-y: auto;
    }
    #skilltree-overlay.visible { display: flex; }
 
    #skilltree-modal {
      display: flex; flex-direction: column; align-items: center;
-     gap: 18px; max-width: 900px; width: 97%;
+     gap: 18px; max-width: 1120px; width: 97%;
+     padding: 20px 0;
    }
 
    #st-header {
