@@ -70,7 +70,7 @@ const CFG = {
   THUMB_PRECOND_FINGERS: 3,    // at least 3 of 4 non-thumb fingers must be not raised
 
   // Aether Seeker — base turn rate (rad/s). Low = can miss; skill tree raises it
-  AETHER_TURN_RATE:    2.4,
+  AETHER_TURN_RATE:    1.3,
 
   // Tesla Lance — max enemies pierced per beam (skill tree can raise)
   TESLA_BASE_PIERCE:   2,
@@ -131,7 +131,7 @@ const SKILL_TREE = [
     id: 'arsenal', label: 'ARSENAL', color: '#d090ff', icon: '\u2694',
     nodes: [
       { id:'ars_1', name:'Ricochet Spring', icon:'\u21BB', desc:'+1 bounce to Ricochet Chamber',         stat:'ricoBounce',  val:1,    cost:1, req:null    },
-      { id:'ars_2', name:'Seeker Coils',    icon:'\u2726', desc:'+tracking force to Aether Seeker',      stat:'aetherForce', val:2.2,  cost:1, req:'ars_1' },
+      { id:'ars_2', name:'Seeker Coils',    icon:'\u2726', desc:'+tracking force to Aether Seeker',      stat:'aetherForce', val:1.8,  cost:1, req:'ars_1' },
       { id:'ars_3', name:'Tesla Capacitor', icon:'\u26A1', desc:'+30% fire rate to Tesla Lance',         stat:'teslaAtk',    val:0.30, cost:2, req:'ars_2' },
       { id:'ars_4', name:'Prismatic Core',  icon:'\u25C6', desc:'Tesla Lance pierces 3 enemies',         stat:'teslaPierce', val:1,    cost:2, req:'ars_3' },
       { id:'ars_5', name:'Chaos Gearing',   icon:'\u21BB', desc:'+1 more bounce to Ricochet Chamber',   stat:'ricoBounce',  val:1,    cost:3, req:'ars_4' },
@@ -1307,13 +1307,33 @@ function unlockAllWeapons() {
 window.addEventListener('keydown', e => {
   keys.add(e.key);
 
+  // Cmd+Shift+R (Mac) or Ctrl+Shift+R (Win/Linux) — wipe persistent XP/skills
+  if (e.code === 'KeyR' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    PERSIST.totalXP = 0;
+    PERSIST.level   = 1;
+    PERSIST.skills  = {};
+    savePersist();
+    updateXPBar();
+    applySkillBonuses();
+    // Visual confirmation particle burst at screen centre
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * Math.PI * 2;
+      const s = 180 + Math.random() * 120;
+      particles.push({ x: GW/2, y: GH/2, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 40,
+        r: 2 + Math.random()*3, life: 1.2, decay: 0.7, color: '#e05050' });
+    }
+    particles.push({ isDmgText: true, x: GW/2, y: GH/2 - 40, vy: -30,
+      text: 'PROGRESS RESET', color: '#e05050', size: 18, life: 2.4, decay: 0.35 });
+    return;
+  }
+
   if (e.code === 'KeyP') {
     togglePause();
     return;
   }
 
   if (e.code === 'KeyM') {
-    // Return to main menu — confirm first to avoid accidental resets
     if (gameState !== 'gameover' && gameState !== 'weapon-select') {
       showMainMenuConfirm();
     }
