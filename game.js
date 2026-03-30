@@ -47,32 +47,26 @@ const CFG = {
   ORB_HEAL_MAX:           300,
   ORB_FALL_SPEED:         240,         // full-viewport px/sec
 
-  // Hand remapping — maps camera sub-range to full game range.
-  // Tweak these to match your comfortable arm movement.
-  HAND_X0: 0.18,   HAND_X1: 0.82,     // camera X [0.18, 0.82] → game [0, 1]
-  HAND_Y0: 0.18,   HAND_Y1: 0.88,     // camera Y [0.18, 0.88] → game [0, 1]
 
-  // ---- Phase 4: Gesture thresholds ----
+  HAND_X0: 0.18,   HAND_X1: 0.82,     // camera X [0.18, 0.82] game [0, 1]
+  HAND_Y0: 0.18,   HAND_Y1: 0.88,     // camera Y [0.18, 0.88]  game [0, 1]
+
+  // Gesture thresholds 
   GESTURE_HOLD_FRAMES:  95,    // hold finger gesture ~3.17s to select card
   THUMB_HOLD_FRAMES:    95,    // hold thumb gesture ~3.17s to confirm/cancel (increased)
   FIST_HOLD_FRAMES:     95,    // hold fist ~3.17s to click in menu
   GESTURE_COOLDOWN_MS:  1400,  // ms between any two confirmed gesture actions
-  FINGER_MARGIN:        0.06,  // tip must be this far above PIP to count as extended
+  FINGER_MARGIN:        0.06,  
 
-  // Thumb thresholds — use CMC (LM1) as base, not MCP (LM2).
-  // CMC is deeper in the palm → more vertical travel → easier to hit reliably.
-  // diff = lms[1].y - lms[4].y  (positive = tip above CMC = thumbs UP in camera space)
-  THUMB_MARGIN_UP:      0.07,  // was 0.12 — thumb tip ~7% above CMC registers as up
-  THUMB_MARGIN_DOWN:    0.06,  // thumb tip ~6% below CMC registers as down
 
-  // How many fingers must be "not extended" before thumb direction means anything.
-  // Loose check: tip.y > MCP.y - 0.04 (tip not more than 4% above MCP).
+  THUMB_MARGIN_UP:      0.07,  
+  THUMB_MARGIN_DOWN:    0.06,  
+
+
   THUMB_PRECOND_FINGERS: 3,    // at least 3 of 4 non-thumb fingers must be not raised
 
-  // Aether Seeker — base turn rate (rad/s). Low = can miss; skill tree raises it
   AETHER_TURN_RATE:    1.3,
 
-  // Tesla Lance — max enemies pierced per beam (skill tree can raise)
   TESLA_BASE_PIERCE:   2,
 };
 
@@ -91,8 +85,7 @@ function killXP(w) { return Math.round(15 * Math.pow(w, 1.2)); }
 // wave 1: 100  |  wave 5: 765  |  wave 10: 1985  |  wave 20: 5154
 function waveXP(w) { return Math.round(100 * Math.pow(w, 1.4)); }
 
-// Three paths, four nodes each.
-// Three paths, six nodes each. Bonuses persist across all runs.
+// Four paths, eight nodes each. Bonuses persist across all runs.
 const SKILL_TREE = [
   {
     id: 'defense', label: 'DEFENSE', color: '#5a90e0', icon: '\u26CA',
@@ -103,39 +96,47 @@ const SKILL_TREE = [
       { id:'def_4', name:'Blast Dampener',   icon:'\u25CE', desc:'Reduce bullet damage by 8%',         stat:'dmgReduce', val:0.08, cost:2, req:'def_3' },
       { id:'def_5', name:'Iron Cathedral',   icon:'\u2736', desc:'Titan-grade hull reinforcement',     stat:'maxHp',     val:0.40, cost:3, req:'def_4' },
       { id:'def_6', name:'Titan Chassis',    icon:'\u2654', desc:'Near-impenetrable plating layers',   stat:'dmgReduce', val:0.15, cost:3, req:'def_5' },
+      { id:'def_7', name:'Tempered Rivets',  icon:'\u2B1F', desc:'Forged-steel secondary plating',    stat:'maxHp',     val:0.20, cost:3, req:'def_6' },
+      { id:'def_8', name:'Aegis Protocol',   icon:'\u2726', desc:'Emergency absorption matrix',        stat:'dmgReduce', val:0.12, cost:4, req:'def_7' },
     ]
   },
   {
     id: 'attack', label: 'ATTACK', color: '#e05a5a', icon: '\u2694',
     nodes: [
-      { id:'atk_1', name:'Refined Powder',  icon:'\u25C6', desc:'Higher-grade propellant charge',     stat:'damage',    val:0.10, cost:1, req:null    },
-      { id:'atk_2', name:'Hair Trigger',     icon:'\u25CE', desc:'Faster firing mechanism cycle',      stat:'atkSpeed',  val:0.10, cost:1, req:'atk_1' },
-      { id:'atk_3', name:'Precision Sight',  icon:'\u2726', desc:'Improved critical hit chance',       stat:'critChance',val:0.08, cost:2, req:'atk_2' },
-      { id:'atk_4', name:'Volatile Core',    icon:'\u2605', desc:'Devastating critical hit damage',    stat:'critMult',  val:0.25, cost:2, req:'atk_3' },
-      { id:'atk_5', name:'Arcane Charge',    icon:'\u25C6', desc:'Elite propellant charge mix',        stat:'damage',    val:0.15, cost:3, req:'atk_4' },
-      { id:'atk_6', name:'Inferno Chamber',  icon:'\u2726', desc:'Precision crit targeting system',    stat:'critChance',val:0.10, cost:3, req:'atk_5' },
+      { id:'atk_1', name:'Refined Powder',   icon:'\u25C6', desc:'Higher-grade propellant charge',    stat:'damage',    val:0.10, cost:1, req:null    },
+      { id:'atk_2', name:'Hair Trigger',      icon:'\u25CE', desc:'Faster firing mechanism cycle',     stat:'atkSpeed',  val:0.10, cost:1, req:'atk_1' },
+      { id:'atk_3', name:'Precision Sight',   icon:'\u2726', desc:'Improved critical hit chance',      stat:'critChance',val:0.08, cost:2, req:'atk_2' },
+      { id:'atk_4', name:'Volatile Core',     icon:'\u2605', desc:'Devastating critical hit damage',   stat:'critMult',  val:0.25, cost:2, req:'atk_3' },
+      { id:'atk_5', name:'Arcane Charge',     icon:'\u25C6', desc:'Elite propellant charge mix',       stat:'damage',    val:0.15, cost:3, req:'atk_4' },
+      { id:'atk_6', name:'Inferno Chamber',   icon:'\u2726', desc:'Precision crit targeting system',   stat:'critChance',val:0.10, cost:3, req:'atk_5' },
+      { id:'atk_7', name:'Blast Rounds',      icon:'\u25C6', desc:'Experimental explosive propellant', stat:'damage',    val:0.20, cost:3, req:'atk_6' },
+      { id:'atk_8', name:'Annihilator Core',  icon:'\u2605', desc:'Catastrophic crit amplification',   stat:'critMult',  val:0.40, cost:4, req:'atk_7' },
     ]
   },
   {
     id: 'utility', label: 'UTILITY', color: '#50d4a0', icon: '\u2699',
     nodes: [
-      { id:'utl_1', name:'Steam Turbine',   icon:'\u26A1', desc:'Boost thruster output',              stat:'moveSpeed', val:0.10, cost:1, req:null    },
-      { id:'utl_2', name:'Medic Orbs',       icon:'\u2665', desc:'Orbs heal +2% more HP on pickup',    stat:'orbHeal',   val:0.02, cost:1, req:'utl_1' },
-      { id:'utl_3', name:'Aether Fuel',      icon:'\u27A4', desc:'Faster projectile velocity',         stat:'bulletSpeed',val:0.12,cost:2, req:'utl_2' },
-      { id:'utl_4', name:'Fortune Gears',    icon:'\u29BE', desc:'Higher chance for health orb drops', stat:'orbDrop',   val:0.10, cost:2, req:'utl_3' },
-      { id:'utl_5', name:'Overdrive',        icon:'\u26A1', desc:'Extreme thruster overdrive',         stat:'moveSpeed', val:0.15, cost:3, req:'utl_4' },
-      { id:'utl_6', name:'Vital Essence',    icon:'\u2665', desc:'Orbs heal an additional +3% HP',     stat:'orbHeal',   val:0.03, cost:3, req:'utl_5' },
+      { id:'utl_1', name:'Steam Turbine',    icon:'\u26A1', desc:'Boost thruster output',             stat:'moveSpeed',  val:0.10, cost:1, req:null    },
+      { id:'utl_2', name:'Medic Orbs',        icon:'\u2665', desc:'Orbs heal +2% more HP on pickup',   stat:'orbHeal',    val:0.02, cost:1, req:'utl_1' },
+      { id:'utl_3', name:'Aether Fuel',       icon:'\u27A4', desc:'Faster projectile velocity',        stat:'bulletSpeed',val:0.12, cost:2, req:'utl_2' },
+      { id:'utl_4', name:'Fortune Gears',     icon:'\u29BE', desc:'Higher chance for health orb drops',stat:'orbDrop',    val:0.10, cost:2, req:'utl_3' },
+      { id:'utl_5', name:'Overdrive',         icon:'\u26A1', desc:'Extreme thruster overdrive',        stat:'moveSpeed',  val:0.15, cost:3, req:'utl_4' },
+      { id:'utl_6', name:'Vital Essence',     icon:'\u2665', desc:'Orbs heal an additional +3% HP',    stat:'orbHeal',    val:0.03, cost:3, req:'utl_5' },
+      { id:'utl_7', name:'Pressure Vents',    icon:'\u27A4', desc:'Supercharged aether propellant',    stat:'bulletSpeed',val:0.18, cost:3, req:'utl_6' },
+      { id:'utl_8', name:'Salvage Protocol',  icon:'\u29BE', desc:'Reclamation field pulls more orbs', stat:'orbDrop',    val:0.15, cost:4, req:'utl_7' },
     ]
   },
   {
     id: 'arsenal', label: 'ARSENAL', color: '#d090ff', icon: '\u2694',
     nodes: [
-      { id:'ars_1', name:'Ricochet Spring', icon:'\u21BB', desc:'+1 bounce to Ricochet Chamber',         stat:'ricoBounce',  val:1,    cost:1, req:null    },
-      { id:'ars_2', name:'Seeker Coils',    icon:'\u2726', desc:'+tracking force to Aether Seeker',      stat:'aetherForce', val:1.8,  cost:1, req:'ars_1' },
-      { id:'ars_3', name:'Tesla Capacitor', icon:'\u26A1', desc:'+30% fire rate to Tesla Lance',         stat:'teslaAtk',    val:0.30, cost:2, req:'ars_2' },
-      { id:'ars_4', name:'Prismatic Core',  icon:'\u25C6', desc:'Tesla Lance pierces 3 enemies',         stat:'teslaPierce', val:1,    cost:2, req:'ars_3' },
-      { id:'ars_5', name:'Chaos Gearing',   icon:'\u21BB', desc:'+1 more bounce to Ricochet Chamber',   stat:'ricoBounce',  val:1,    cost:3, req:'ars_4' },
-      { id:'ars_6', name:'Seeker Override', icon:'\u2726', desc:'Aether full lock-on mode',              stat:'aetherForce', val:3.8,  cost:3, req:'ars_5' },
+      { id:'ars_1', name:'Ricochet Spring',  icon:'\u21BB', desc:'+1 bounce to Ricochet Chamber',      stat:'ricoBounce',  val:1,    cost:1, req:null    },
+      { id:'ars_2', name:'Seeker Coils',     icon:'\u2726', desc:'+tracking force to Aether Seeker',   stat:'aetherForce', val:1.8,  cost:1, req:'ars_1' },
+      { id:'ars_3', name:'Tesla Capacitor',  icon:'\u26A1', desc:'+30% fire rate to Tesla Lance',      stat:'teslaAtk',    val:0.30, cost:2, req:'ars_2' },
+      { id:'ars_4', name:'Prismatic Core',   icon:'\u25C6', desc:'Tesla Lance pierces 3 enemies',      stat:'teslaPierce', val:1,    cost:2, req:'ars_3' },
+      { id:'ars_5', name:'Chaos Gearing',    icon:'\u21BB', desc:'+1 more bounce to Ricochet Chamber', stat:'ricoBounce',  val:1,    cost:3, req:'ars_4' },
+      { id:'ars_6', name:'Seeker Override',  icon:'\u2726', desc:'Aether full lock-on mode',           stat:'aetherForce', val:3.8,  cost:3, req:'ars_5' },
+      { id:'ars_7', name:'Burst Actuator',   icon:'\u26A1', desc:'+15% fire rate for all weapons',     stat:'atkSpeed',    val:0.15, cost:3, req:'ars_6' },
+      { id:'ars_8', name:'Omega Lance',      icon:'\u25C6', desc:'Tesla Lance pierces one more enemy', stat:'teslaPierce', val:1,    cost:4, req:'ars_7' },
     ]
   },
 ];
@@ -254,6 +255,8 @@ function applySkillBonuses() {
   if (s.def_4) dmgReduce += 0.08;
   if (s.def_5) hpMult    += 0.40;
   if (s.def_6) dmgReduce += 0.15;
+  if (s.def_7) hpMult    += 0.20;
+  if (s.def_8) dmgReduce += 0.12;
 
   let dmgMult = 1.0, atkMult = 1.0, critBonus = 0, critMultBonus = 0;
   if (s.atk_1) dmgMult       += 0.10;
@@ -262,6 +265,8 @@ function applySkillBonuses() {
   if (s.atk_4) critMultBonus += 0.25;
   if (s.atk_5) dmgMult       += 0.15;
   if (s.atk_6) critBonus     += 0.10;
+  if (s.atk_7) dmgMult       += 0.20;
+  if (s.atk_8) critMultBonus += 0.40;
 
   let speedMult = 1.0, orbHealBonus = 0, bspeedMult = 1.0, orbDropBonus = 0;
   if (s.utl_1) speedMult    += 0.10;
@@ -270,6 +275,8 @@ function applySkillBonuses() {
   if (s.utl_4) orbDropBonus += 0.10;
   if (s.utl_5) speedMult    += 0.15;
   if (s.utl_6) orbHealBonus += 0.03;
+  if (s.utl_7) bspeedMult   += 0.18;
+  if (s.utl_8) orbDropBonus += 0.15;
 
   let ricochetExtraBounces = 0, aetherTurnBonus = 0, teslaAtkBonus = 0, teslaPierceBonus = 0;
   if (s.ars_1) ricochetExtraBounces += 1;
@@ -278,6 +285,8 @@ function applySkillBonuses() {
   if (s.ars_4) teslaPierceBonus     += 1;
   if (s.ars_5) ricochetExtraBounces += 1;
   if (s.ars_6) aetherTurnBonus      += 3.8;
+  if (s.ars_7) atkMult              += 0.15;
+  if (s.ars_8) teslaPierceBonus     += 1;
 
   const baseHp = Math.round(CFG.BASE_HP * hpMult);
   player.hp           = baseHp;
@@ -305,16 +314,16 @@ function isNodeUnlocked(node) {
   if (!node.req) return true;
   return !!PERSIST.skills[node.req];
 }
-const ST_W = 1060, ST_H = 540;
+const ST_W = 1060, ST_H = 680;
 const ST_NR = 28;
 const ST_HR = 40;
 const ST_HUB = { x: 530, y: 52 };
 
 const ST_POS = {
-  defense: [[115,148],[115,213],[115,278],[115,343],[115,408],[115,468]],
-  attack:  [[365,148],[365,213],[365,278],[365,343],[365,408],[365,468]],
-  utility: [[695,148],[695,213],[695,278],[695,343],[695,408],[695,468]],
-  arsenal: [[945,148],[945,213],[945,278],[945,343],[945,408],[945,468]],
+  defense: [[115,148],[115,213],[115,278],[115,343],[115,408],[115,468],[115,533],[115,598]],
+  attack:  [[365,148],[365,213],[365,278],[365,343],[365,408],[365,468],[365,533],[365,598]],
+  utility: [[695,148],[695,213],[695,278],[695,343],[695,408],[695,468],[695,533],[695,598]],
+  arsenal: [[945,148],[945,213],[945,278],[945,343],[945,408],[945,468],[945,533],[945,598]],
 };
 
 let _stCv = null, _stCx = null, _stRaf = null, _stHover = null;
@@ -783,8 +792,6 @@ function makeEnemy(baseX, y, w) {
 
 // ================================================================
 // PARALLAX BACKGROUND
-// Three layers scroll at different speeds for depth.
-// Items are placed in a 2×GH tile so we can wrap seamlessly.
 // ================================================================
 
 function gearPath(ctx2, cx, cy, outerR, angle, teeth) {
@@ -1098,7 +1105,36 @@ function showWeaponSelect() {
   const stBtn = document.getElementById('weapon-skilltree-btn');
   if (stBtn) stBtn.onclick = showSkillTree;
 
+  // Reset progress button
+  const rpBtn = document.getElementById('weapon-resetprogress-btn');
+  if (rpBtn) rpBtn.onclick = showResetProgressConfirm;
+
   showOverlay('weapon-overlay');
+}
+
+function resetProgress() {
+  PERSIST.totalXP = 0;
+  PERSIST.level   = 1;
+  PERSIST.skills  = {};
+  savePersist();
+  updateXPBar();
+  applySkillBonuses();
+}
+
+function showResetProgressConfirm() {
+  const overlay = document.getElementById('resetprogress-overlay');
+  if (!overlay) return;
+  overlay.classList.add('visible');
+
+  document.getElementById('rp-yes-btn').onclick = () => {
+    overlay.classList.remove('visible');
+    resetProgress();
+    // Refresh weapon select so SP counter and skill tree reflect the reset
+    showWeaponSelect();
+  };
+  document.getElementById('rp-no-btn').onclick = () => {
+    overlay.classList.remove('visible');
+  };
 }
 
 
@@ -1149,7 +1185,7 @@ function applyWeapon(wep) {
 // Each formation fn receives (count, wave) and pushes into enemies[].
 const FORMATIONS = [
 
-  // 0 · Classic grid — the baseline
+  //  Classic grid — the baseline
   function formGrid(count) {
     const cols    = Math.min(count, 7);
     const margin  = 90;
@@ -1166,7 +1202,7 @@ const FORMATIONS = [
     }
   },
 
-  // 1 · V-wedge pointing down
+  //  V-wedge pointing down
   function formWedge(count) {
     const cx = GW / 2;
     const yBase = GH * CFG.ENEMY_ZONE_TOP + 40;
@@ -1179,7 +1215,7 @@ const FORMATIONS = [
     }
   },
 
-  // 2 · Diamond / rhombus
+  //  Diamond / rhombus
   function formDiamond(count) {
     const cx   = GW / 2;
     const cyTop = GH * CFG.ENEMY_ZONE_TOP + 30;
@@ -1196,7 +1232,7 @@ const FORMATIONS = [
     }
   },
 
-  // 3 · Two flanking columns
+  //  Two flanking columns
   function formColumns(count) {
     const yBase  = GH * CFG.ENEMY_ZONE_TOP + 30;
     const yStep  = 62;
@@ -1210,7 +1246,7 @@ const FORMATIONS = [
     }
   },
 
-  // 4 · Arc / crescent across the top
+  // Arc / crescent across the top
   function formArc(count) {
     const cx    = GW / 2;
     const cy    = GH * CFG.ENEMY_ZONE_TOP - 20;
@@ -1225,7 +1261,7 @@ const FORMATIONS = [
     }
   },
 
-  // 5 · X cross
+  //  X cross
   function formCross(count) {
     const cx    = GW / 2;
     const yBase = GH * CFG.ENEMY_ZONE_TOP + 20;
@@ -1306,27 +1342,6 @@ function unlockAllWeapons() {
 
 window.addEventListener('keydown', e => {
   keys.add(e.key);
-
-  // Cmd+Shift+R (Mac) or Ctrl+Shift+R (Win/Linux) — wipe persistent XP/skills
-  if (e.code === 'KeyR' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
-    e.preventDefault();
-    PERSIST.totalXP = 0;
-    PERSIST.level   = 1;
-    PERSIST.skills  = {};
-    savePersist();
-    updateXPBar();
-    applySkillBonuses();
-    // Visual confirmation particle burst at screen centre
-    for (let i = 0; i < 28; i++) {
-      const a = (i / 28) * Math.PI * 2;
-      const s = 180 + Math.random() * 120;
-      particles.push({ x: GW/2, y: GH/2, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 40,
-        r: 2 + Math.random()*3, life: 1.2, decay: 0.7, color: '#e05050' });
-    }
-    particles.push({ isDmgText: true, x: GW/2, y: GH/2 - 40, vy: -30,
-      text: 'PROGRESS RESET', color: '#e05050', size: 18, life: 2.4, decay: 0.35 });
-    return;
-  }
 
   if (e.code === 'KeyP') {
     togglePause();
@@ -1536,11 +1551,11 @@ function spawnWeaponBullets() {
     fireBullet(bx, by, -Math.PI / 2, mult, { type: 'homing', turnRate: tr });
   } else if (player.weapon === 'ricochet') {
     // 150° arc (-75° to +75° from straight up), edge-biased
-    // Use a U-shaped distribution: bias toward the ±75° extremes
+    //  U-shaped distribution: bias toward the +-75° extremes
     const halfArc = (75 * Math.PI) / 180; // 75° in radians
     const u = Math.random();
-    // Bias toward edges: map uniform [0,1] → edge-heavy via power curve
-    // u < 0.5 → negative side, u >= 0.5 → positive side
+    // Bias toward edges: map uniform [0,1] - edge-heavy via power curve
+    // u < 0.5 → negative side, u >= 0.5 - positive side
     const sign = u < 0.5 ? -1 : 1;
     const t = sign < 0 ? (0.5 - u) * 2 : (u - 0.5) * 2; // [0,1] per side
     // Power curve (exponent < 1 pushes mass toward edges)
@@ -2427,9 +2442,6 @@ function remapHand(rawVal, lo, hi) {
 
 function setHandTargets(landmarks) {
   // Guard: landmarks must be a full 21-point array with finite coordinates.
-  // A malformed/partial frame (e.g. MediaPipe returning NaN or undefined for
-  // a partially-detected hand) would otherwise push NaN into player.tx/ty,
-  // which collapses to 0 after Math.max/min and teleports the ship top-left.
   if (!Array.isArray(landmarks) || landmarks.length < 21) return;
   const tip = landmarks[8];
   if (!tip || !isFinite(tip.x) || !isFinite(tip.y)) return;
@@ -2448,25 +2460,9 @@ function setHandTargets(landmarks) {
 }
 
 // ================================================================
-// PHASE 4 — GESTURE ENGINE
+// GESTURE ENGINE
 // ================================================================
 
-// ---- Landmark indices reference ----
-// Wrist:        0
-// Thumb CMC:    1   ← deepest thumb joint, use as base for up/down
-// Thumb MCP:    2
-// Thumb IP:     3
-// Thumb Tip:    4
-// Index  MCP:5  PIP:6  DIP:7  Tip:8
-// Middle MCP:9  PIP:10 DIP:11 Tip:12
-// Ring   MCP:13 PIP:14 DIP:15 Tip:16
-// Pinky  MCP:17 PIP:18 DIP:19 Tip:20
-//
-// Y-axis in MediaPipe: 0=top of frame, 1=bottom.
-// "Above" in real space = SMALLER y value.
-
-// Strict check: all 4 finger tips well below their PIP joints (tight fist).
-// Used only for fist-click detection.
 function _fingersCurledStrict(lms) {
   return lms[8].y  > lms[6].y  &&
          lms[12].y > lms[10].y &&
@@ -2474,11 +2470,8 @@ function _fingersCurledStrict(lms) {
          lms[20].y > lms[18].y;
 }
 
-// Loose check: finger tips not significantly above their MCP joints.
-// Used as precondition for thumb detection — passes for a relaxed closed hand
-// or a loosely curled fist (thumbs-up position).
 function _fingersNotRaised(lms) {
-  // tip.y > mcp.y - 0.04 means tip is not more than 4% above MCP
+  // tip.y > mcp.y - 0.04 tip is not more than 4% above MCP
   const t = 0.04;
   let notRaised = 0;
   if (lms[8].y  > lms[5].y  - t) notRaised++;  // index
@@ -2688,7 +2681,7 @@ function processGesture(lms) {
   const now = performance.now();
 
   // ================================================================
-  // STAGE 2: Thumb confirmation (blocks stage 1)
+  // Thumb confirmation 
   // ================================================================
   if (GS.confirming) {
     const thumb = _detectThumb(lms);
@@ -2771,7 +2764,7 @@ function processGesture(lms) {
   }
 
   // ================================================================
-  // STAGE 1: Finger-count card selection
+  // Finger-count card selection
   // ================================================================
   if (now < GS.coolUntil) return;
 
@@ -2789,7 +2782,6 @@ function processGesture(lms) {
   }
 
   if (f !== GS.fingers) {
-    // Finger count changed — restart hold from 1
     GS.fingers    = f;
     GS.holdFrames = 1;
     _clearGestureBar(prefix);

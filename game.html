@@ -97,7 +97,6 @@
       <span>M &mdash; MAIN MENU</span>
       <span>U &mdash; UNLOCK ALL</span>
       <span>R &mdash; RESTART (game over)</span>
-      <span>&#8984;+&#8679;+R &mdash; RESET PROGRESS</span>
     </div>
 
   </div>
@@ -124,7 +123,10 @@
       </div>
       <div class="gesture-hold-wrap"><div id="wg-bar" class="gesture-hold-bar"></div></div>
       <div class="overlay-hint">HOLD GESTURE OR POINT &amp; FIST TO SELECT</div>
-      <button id="weapon-skilltree-btn" class="confirm-action-btn st-entry-btn">&#9651; &nbsp; SKILL TREE &nbsp; &#9651;</button>
+      <div class="weapon-overlay-actions">
+        <button id="weapon-skilltree-btn" class="confirm-action-btn st-entry-btn">&#9651; &nbsp; SKILL TREE &nbsp; &#9651;</button>
+        <button id="weapon-resetprogress-btn" class="confirm-action-btn rp-entry-btn">&#9888; &nbsp; RESET PROGRESS &nbsp; &#9888;</button>
+      </div>
     </div>
   </div>
 
@@ -199,6 +201,19 @@
     </div>
   </div>
 
+  <!-- Reset Progress confirm overlay -->
+  <div id="resetprogress-overlay">
+    <div id="resetprogress-modal">
+      <div class="modal-title danger" style="font-size:22px;letter-spacing:5px;">&#9888; RESET PROGRESS?</div>
+      <div class="mainmenu-warning">This will permanently wipe your level, skill points, and all purchased skills.</div>
+      <div class="mainmenu-warning" style="color:var(--rust);font-size:11px;letter-spacing:2px;margin-top:4px;">THIS ACTION CANNOT BE UNDONE.</div>
+      <div id="mainmenu-btns" style="margin-top:14px;">
+        <button id="rp-yes-btn" class="confirm-action-btn danger-btn">[ YES — WIPE ALL PROGRESS ]</button>
+        <button id="rp-no-btn"  class="confirm-action-btn">[ NO — KEEP PROGRESS ]</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Level-up banner -->
   <div id="level-up-banner">
     <span id="lvlup-text">LEVEL UP!</span>
@@ -215,7 +230,7 @@
         </div>
       </div>
       <div id="st-columns">
-        <canvas id="st-canvas" width="1060" height="540" style="max-width:100%;height:auto;display:block;"></canvas>
+        <canvas id="st-canvas" width="1060" height="680" style="max-width:100%;height:auto;display:block;"></canvas>
       </div>
       <div id="st-legend">CLICK AN AVAILABLE NODE TO SPEND A SKILL POINT &mdash; BONUSES APPLY EVERY RUN</div>
       <button id="st-close-btn" class="confirm-action-btn">[ BACK TO WEAPON SELECT ]</button>
