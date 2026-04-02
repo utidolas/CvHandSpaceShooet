@@ -43,8 +43,7 @@
      z-index: 0;
    }
    
-   /* ================================================================
-      HUD
+   /* HUD
       ================================================================ */
    #hud {
      position: absolute;
@@ -153,8 +152,7 @@
      display: none; white-space: nowrap;
    }
    
-   /* ================================================================
-      WAVE ANNOUNCE
+   /* WAVE ANNOUNCE
       ================================================================ */
    #wave-announce {
      position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
@@ -164,8 +162,7 @@
    }
    #wave-announce.show { opacity: 1; }
    
-   /* ================================================================
-      HAND VIEWER (bottom-right)
+   /* HAND VIEWER (bottom-right)
       ================================================================ */
    #hand-viewer {
      position: absolute; bottom: 50px; right: 14px;
@@ -181,19 +178,15 @@
    }
    #hand-canvas-wrap canvas { display: block; }
    
-   /* ================================================================
-      OVERLAYS
+   /* OVERLAYS
       ================================================================ */
    #weapon-overlay, #upgrade-overlay, #pause-overlay, #gameover-overlay {
-     display: none;
-     position: absolute; top: 0; left: 0;
-     width: 100%; height: 100%;
-     z-index: 50;
-     background: rgba(9, 7, 10, 0.90);
+     display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+     z-index: 50; background: rgba(9,7,10,0.90);
      align-items: center; justify-content: center; flex-direction: column;
    }
    #weapon-overlay.visible, #upgrade-overlay.visible,
-   #pause-overlay.visible, #gameover-overlay.visible { display: flex; }
+   #pause-overlay.visible,  #gameover-overlay.visible { display: flex; }
    
    #weapon-modal, #upgrade-modal {
      display: flex; flex-direction: column; align-items: center;
@@ -233,9 +226,7 @@
    .upgrade-card.locked .card-name,
    .upgrade-card.locked .card-desc,
    .upgrade-card.locked .card-stat,
-   .upgrade-card.locked .card-stat2 {
-     color: #6a5442 !important;
-   }
+   .upgrade-card.locked .card-stat2 { color: #6a5442 !important; }
    .lock-badge {
      position: absolute; top: 10px; right: 10px;
      font-size: 9px; letter-spacing: 2px;
@@ -274,12 +265,9 @@
      transition: background 0.2s, color 0.2s, border-color 0.2s;
    }
    
-   #restart-btn:hover {
-     background: rgba(200,134,10,0.14); color: var(--brass); border-color: var(--brass);
-   }
+   #restart-btn:hover { background: rgba(200,134,10,0.14); color: var(--brass); border-color: var(--brass); }
    
-   /* ================================================================
-      GESTURE HINT ROWS (below card overlays)
+   /* GESTURE HINT ROWS (below card overlays)
       ================================================================ */
    .gesture-hint-row {
      display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center;
@@ -320,8 +308,7 @@
      box-shadow: 0 0 12px rgba(96,192,128,0.20);
    }
    
-   /* ================================================================
-      CONFIRM OVERLAY
+   /* CONFIRM OVERLAY
       ================================================================ */
    #confirm-overlay {
      display: none;
@@ -374,8 +361,7 @@
      transition: width 0.04s linear;
    }
    
-   /* ================================================================
-      MAIN MENU CONFIRM OVERLAY
+   /* MAIN MENU CONFIRM OVERLAY
       ================================================================ */
    #mainmenu-overlay {
      display: none;
@@ -418,8 +404,7 @@
      background: rgba(192,64,32,0.14); color: #e05838; border-color: #e05838;
    }
    
-   /* ================================================================
-      PANEL HIDE/SHOW TOGGLE BUTTONS
+   /* PANEL HIDE/SHOW TOGGLE BUTTONS
       ================================================================ */
    .panel-toggle-btn {
      position: absolute; top: 4px; right: 6px;
@@ -436,8 +421,7 @@
    #stats-panel.panel-collapsed > *:not(.panel-heading) { display: none !important; }
    #hand-viewer.panel-collapsed #hand-canvas-wrap { display: none; }
    
-   /* ================================================================
-      XP BAR
+   /* XP BAR
       ================================================================ */
    #xp-display {
      display: flex; align-items: center; gap: 9px;
@@ -459,8 +443,7 @@
      transition: width 0.4s ease;
    }
 
-   /* ================================================================
-      LEVEL-UP BANNER
+   /* LEVEL-UP BANNER
       ================================================================ */
    #level-up-banner {
      position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
@@ -474,8 +457,7 @@
    }
    #level-up-banner.show { opacity: 1; }
 
-   /* ================================================================
-      SKILL TREE OVERLAY
+   /* SKILL TREE OVERLAY
       ================================================================ */
    #skilltree-overlay {
      display: none;
@@ -491,7 +473,6 @@
    #skilltree-modal {
      display: flex; flex-direction: column; align-items: center;
      gap: 18px; max-width: 1120px; width: 97%;
-     max-height: 96vh;
      padding: 20px 0;
    }
 
@@ -509,30 +490,11 @@
 
    #st-columns {
      width: 100%;
-     max-height: 55vh;          /* fixed viewport window — content scrolls inside */
-     overflow-y: auto;
-     overflow-x: hidden;
      border: 1px solid var(--iron-light);
      background: #060408;
      box-shadow: 0 0 40px rgba(232,160,32,0.06), inset 0 0 60px rgba(0,0,0,0.8);
-     /* steampunk scrollbar */
-     scrollbar-width: thin;
-     scrollbar-color: #c8860a #0e0804;
    }
-   #st-columns::-webkit-scrollbar { width: 8px; }
-   #st-columns::-webkit-scrollbar-track { background: #0e0804; border-left: 1px solid #1a0e04; }
-   #st-columns::-webkit-scrollbar-thumb {
-     background: #c8860a; border-radius: 1px;
-     border: 1px solid #e8a020;
-   }
-   #st-columns::-webkit-scrollbar-thumb:hover { background: #e8a020; }
    #st-canvas { display: block; }
-
-   #st-scroll-hint {
-     text-align: center; font-size: 8px; letter-spacing: 2px;
-     color: var(--text-dim); padding: 6px 0 4px;
-     opacity: 0.55;
-   }
 
    #st-legend {
      font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-align: center;
@@ -547,46 +509,9 @@
      background: rgba(80,212,160,0.10); color: #80ffe0; border-color: #50d4a0;
    }
 
-   .weapon-overlay-actions {
-     display: flex; gap: 18px; align-items: center; justify-content: center;
-     flex-wrap: wrap; margin-top: 4px;
-   }
-
-   .rp-entry-btn {
-     font-size: 10px; letter-spacing: 3px;
-     border-color: #602020; color: #c05050;
-   }
-   .rp-entry-btn:hover {
-     background: rgba(192,64,32,0.12); color: #e07060; border-color: #c05050;
-   }
-
-   /* ================================================================
-      RESET PROGRESS CONFIRM OVERLAY
-      ================================================================ */
-   #resetprogress-overlay {
-     display: none;
-     position: absolute; top: 0; left: 0;
-     width: 100%; height: 100%;
-     z-index: 62;
-     background: rgba(9, 7, 10, 0.92);
-     align-items: center; justify-content: center;
-   }
-   #resetprogress-overlay.visible { display: flex; }
-
-   #resetprogress-modal {
-     display: flex; flex-direction: column; align-items: center;
-     gap: 14px;
-     background: var(--panel-bg);
-     border: 1px solid var(--iron-light);
-     border-top: 2px solid var(--rust);
-     padding: 40px 56px;
-     min-width: 480px;
-   }
-
    #val-cdmg { color: var(--rust) !important; }
    
-   /* ================================================================
-      MENU CURSOR (index finger pointer in overlays)
+   /* MENU CURSOR (index finger pointer in overlays)
       ================================================================ */
    #menu-cursor {
      display: none;
