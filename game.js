@@ -1018,7 +1018,7 @@ function initGame() {
   score=0; wave=0; waveTimer=CFG.WAVE_TIMER; shootTimer=1/CFG.BASE_ATK_SPEED;
   groupDir=1; groupX=0; screenFlash=0; gameState='weapon-select'; teslaBeamFx=null;
 
-  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay', 'confirm-overlay'].forEach(hideOverlay);
+  ['upgrade-overlay', 'pause-overlay', 'gameover-overlay', 'confirm-overlay', 'resetprogress-overlay'].forEach(hideOverlay);
   updateStatsPanel();
   updateTopBar();
   showWeaponSelect();
@@ -1066,7 +1066,18 @@ function showWeaponSelect() {
   const stBtn = document.getElementById('weapon-skilltree-btn');
   if (stBtn) stBtn.onclick = showSkillTree;
 
+  const rpBtn = document.getElementById('weapon-resetprogress-btn');
+  if (rpBtn) rpBtn.onclick = showResetProgressConfirm;
+
   showOverlay('weapon-overlay');
+}
+
+function showResetProgressConfirm() {
+  showOverlay('resetprogress-overlay');
+}
+
+function hideResetProgressConfirm() {
+  hideOverlay('resetprogress-overlay');
 }
 
 
@@ -2830,17 +2841,30 @@ function loop(now) {
 // ================================================================
 initHandViewer();
 loadPersist();
+_initHudRefs();
 updateXPBar();
 connectWS();
 initGame();
-kbShortcutsEl.style.display = 'flex';   // always visible
-_initHudRefs(); // cache DOM refs after DOM is ready
+kbShortcutsEl.style.display = 'flex';
 
 // Skill tree close button
 document.getElementById('st-close-btn').addEventListener('click', () => {
   hideSkillTree();
-  applySkillBonuses();   // re-apply in case new skills were bought
+  applySkillBonuses();
   showWeaponSelect();
 });
+
+// Reset-progress confirm buttons
+document.getElementById('rp-yes-btn').addEventListener('click', () => {
+  PERSIST.totalXP = 0;
+  PERSIST.level   = 1;
+  PERSIST.skills  = {};
+  savePersist();
+  updateXPBar();
+  applySkillBonuses();
+  hideResetProgressConfirm();
+  showWeaponSelect();
+});
+document.getElementById('rp-no-btn').addEventListener('click', hideResetProgressConfirm);
 
 requestAnimationFrame(loop);

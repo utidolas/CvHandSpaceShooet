@@ -25,8 +25,11 @@ import http.server
 import json
 import logging
 import math
+import os
 import queue as _queue
+import signal
 import ssl
+import subprocess
 import threading
 import time
 import urllib.request
@@ -69,7 +72,7 @@ MODEL_URL   = (
     "hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 )
 # SHA-256 of the official float16/1 checkpoint (re-verify after any upstream update).
-MODEL_SHA256 = "5d2c8fc1040b6fbc1da37f7d7daf1bb7c61de6a51f77680a01a69b89ba929c78"
+MODEL_SHA256 = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
 
 # FIX #6 — verify model integrity after download (and on every startup).
 def _sha256(path: Path) -> str:
@@ -400,13 +403,13 @@ async def _broadcast_loop() -> None:
                     # FIX #3b — log disconnections instead of silently discarding.
                     log.debug("WS send failed (%s); removing client.", exc)
                     dead.add(ws)
-            _connected_clients -= dead
+            _connected_clients.difference_update(dead)
 
         await asyncio.sleep(1 / _BROADCAST_HZ)
 
 
 async def _run_ws_server() -> None:
-    async with websockets.serve(_ws_handler, "localhost", 8765):
+    async with websockets.serve(_ws_handler, "localhost", 8765, reuse_address=True):
         await _broadcast_loop()
 
 
@@ -446,8 +449,12 @@ class _AssetHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class _ReuseAddrHTTPServer(http.server.HTTPServer):
+    allow_reuse_address = True
+
+
 def start_http_server() -> None:
-    server = http.server.HTTPServer(("localhost", 8766), _AssetHandler)
+    server = _ReuseAddrHTTPServer(("localhost", 8766), _AssetHandler)
     server.serve_forever()
 
 
@@ -548,13 +555,32 @@ def _process_frame(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+def _free_port(port: int) -> None:
+    """SIGTERM any process still holding *port* so we can bind cleanly."""
+    try:
+        out = subprocess.check_output(
+            ["lsof", "-ti", f":{port}"], text=True
+        ).strip()
+        for pid_s in out.split():
+            try:
+                os.kill(int(pid_s), signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        if out:
+            time.sleep(0.4)   # give OS time to release the socket
+    except subprocess.CalledProcessError:
+        pass   # no process on that port — nothing to do
+
+
 def main() -> None:
     # FIX #8 — suppress MediaPipe/TF noise inside main() instead of at module
     # import time, avoiding side-effects on any other library that imports us.
-    import os
     os.environ.setdefault("GLOG_minloglevel",      "2")
     os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL",  "3")
     os.environ.setdefault("MEDIAPIPE_DISABLE_GPU", "1")
+
+    _free_port(8765)
+    _free_port(8766)
 
     _ensure_model()
 
@@ -571,8 +597,20 @@ def main() -> None:
 
     threading.Thread(target=_open_browser, daemon=True, name="browser-opener").start()
 
-    # FIX #10 — camera open failure is now raised with a clear message.
-    cam        = CameraReader(index=0)
+    try:
+        cam = CameraReader(index=0)
+    except RuntimeError as exc:
+        log.warning("Camera unavailable — running in keyboard-only mode. (%s)", exc)
+        log.info("Game still accessible at http://localhost:8766/game.html")
+        log.info("Press Ctrl-C to quit.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        log.info("Exiting.")
+        return
+
     actual_fps = cam.cap.get(cv2.CAP_PROP_FPS)
     log.info(f"Camera opened — reported FPS: {actual_fps:.0f}")
 
